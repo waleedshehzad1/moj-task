@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hmcts-postgres
+    environment:
+      POSTGRES_DB: hmcts_tasks_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - hmcts-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hmcts_tasks_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: hmcts-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - hmcts-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # Application - Development
+  app-dev:
+    build:
+      context: .
+      target: development
+    container_name: hmcts-app-dev
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hmcts_tasks_dev
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: dev-secret-key-change-in-production-2024
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmcts-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # Application - Production
+  app-prod:
+    build:
+      context: .
+      target: production
+    container_name: hmcts-app-prod
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hmcts_tasks_dev
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: production-secret-key-change-this
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmcts-network
+    restart: unless-stopped
+    profiles:
+      - prod
+
+  # Nginx Reverse Proxy (for production)
+  nginx:
+    image: nginx:alpine
+    container_name: hmcts-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - app-prod
+    networks:
+      - hmcts-network
+    restart: unless-stopped
+    profiles:
+      - prod
+
+  # Database Migration Service
+  migrate:
+    build:
+      context: .
+      target: dependencies
+    container_name: hmcts-migrate
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hmcts_tasks_dev
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+    volumes:
+      - .:/usr/src/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hmcts-network
+    command: ["npm", "run", "db:migrate"]
+    profiles:
+      - migrate
+
+networks:
+  hmcts-network:
+    driver: bridge
+    name: hmcts-network
+
+volumes:
+  postgres_data:
+    driver: local
+    name: hmcts-postgres-data
+  redis_data:
+    driver: local
+    name: hmcts-redis-data
