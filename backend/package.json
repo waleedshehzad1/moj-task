@@ -1,0 +1,80 @@
+{
+  "name": "hmcts-task-management-backend",
+  "version": "1.0.0",
+  "description": "Backend API for HMCTS Task Management System",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest --coverage --detectOpenHandles",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --coverage --watchAll=false --ci --detectOpenHandles",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "db:migrate": "npx sequelize-cli db:migrate",
+    "db:seed": "npx sequelize-cli db:seed:all",
+    "db:reset": "npx sequelize-cli db:drop && npx sequelize-cli db:create && npm run db:migrate && npm run db:seed",
+    "docker:build": "docker build -t hmcts-task-api .",
+    "docker:run": "docker run -p 3000:3000 hmcts-task-api",
+    "security:audit": "npm audit",
+    "security:check": "npm audit --audit-level moderate"
+  },
+  "keywords": [
+    "HMCTS",
+    "task-management",
+    "nodejs",
+    "express",
+    "postgresql",
+    "api"
+  ],
+  "author": "HMCTS Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-validator": "^7.2.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "sequelize": "^6.37.3",
+    "pg": "^8.12.0",
+    "pg-hstore": "^2.3.4",
+    "redis": "^4.7.0",
+    "winston": "^3.14.2",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.4.5",
+    "joi": "^17.13.3",
+    "uuid": "^10.0.0",
+    "compression": "^1.7.4",
+    "express-mongo-sanitize": "^2.2.0",
+    "xss": "^1.0.15",
+    "hpp": "^0.2.3",
+    "express-slow-down": "^2.0.3",
+    "swagger-ui-express": "^5.0.1",
+    "swagger-jsdoc": "^6.2.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "eslint": "^9.9.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-security": "^3.0.1",
+    "sequelize-cli": "^6.6.2",
+    "@types/jest": "^29.5.12"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HMCTS/task-management-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HMCTS/task-management-backend/issues"
+  },
+  "homepage": "https://github.com/HMCTS/task-management-backend#readme"
+}
