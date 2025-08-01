@@ -73,7 +73,7 @@ pipeline {
         REDIS_DB = '0'
         
         // JWT Test Configuration
-        JWT_SECRET = 'test-secret-key-for-ci-cd-pipeline'
+        JWT_SECRET = 'a8f7e9c2d1b4f6e8a9c7d5e3f1b8c6d4e7f2a5b9c8e1d6f3a4b7c9e2d8f5a1b6c3e9f7d2a4b8c5e1f6d9a3b7c2e8f4d1a5b9c6e3f7d2a8b4c1e6f9d5a2b7c8e4f1d3a6b9c5e2f8d7a1b4c6e9f3d5a2b8c7e1f4d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4d9a8b6c3e5f1d2a9b7c4e8f6d3a1b5c2e9f7d4a8b6c1e3f5d2a9b7c8e4f1d6a3b5c9e2f7d8a4b1c6e3f9d5a2b8c7e1f4d6a9b3c5e8f2d7a1b4c6e9f3d5a8b2c7e4f1d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4a9d8b6c3e5f1d2a9b7c4e8f6d3a1b5c2e9f7d4a8b6c1e3f5d2a9b7c8e4f1d6a3b5c9e2f7d8a4b1c6e3f9d5a2b8c7e1f4d6a9b3c5e8f2d7a1b4c6e9f3d5a8b2c7e4f1d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4'
         JWT_EXPIRES_IN = '24h'
         
         // Rate Limiting
