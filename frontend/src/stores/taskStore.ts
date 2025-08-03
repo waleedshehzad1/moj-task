@@ -109,15 +109,16 @@ export const useTaskStore = defineStore('task', () => {
 
   const updateTaskStatus = async (id: string, status: string) => {
     try {
-      const updatedTask = await taskService.updateTaskStatus(id, status)
+      const response = await taskService.updateTaskStatus(id, status)
       const index = tasks.value.findIndex(task => task.id === id)
       if (index !== -1) {
-        tasks.value[index] = updatedTask
+        // Merge the response with existing task data to preserve all fields
+        tasks.value[index] = { ...tasks.value[index], ...response }
       }
       if (currentTask.value?.id === id) {
-        currentTask.value = updatedTask
+        currentTask.value = { ...currentTask.value, ...response }
       }
-      return updatedTask
+      return tasks.value[index] || currentTask.value
     } catch (err: any) {
       error.value = err.message || 'Failed to update task status'
       throw err

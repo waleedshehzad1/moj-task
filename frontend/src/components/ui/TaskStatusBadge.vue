@@ -11,11 +11,12 @@
 import { computed } from 'vue'
 
 interface Props {
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
   size?: 'sm' | 'md' | 'lg'
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  status: 'pending',
   size: 'md'
 })
 
@@ -35,7 +36,7 @@ const colorClasses = computed(() => {
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800'
   }
-  return colors[props.status]
+  return colors[props.status || 'pending']
 })
 
 const statusText = computed(() => {
@@ -45,6 +46,6 @@ const statusText = computed(() => {
     completed: 'Completed',
     cancelled: 'Cancelled'
   }
-  return texts[props.status]
+  return texts[props.status || 'pending']
 })
 </script>

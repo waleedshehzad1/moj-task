@@ -67,6 +67,13 @@ export interface TaskStats {
   completion_rate: number
 }
 
+export interface TaskStatusUpdate {
+  id: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  completed_at?: string
+  actual_hours?: number
+}
+
 class TaskService {
   private basePath = '/api/v1/tasks'
 
@@ -90,7 +97,7 @@ class TaskService {
     return response.data.data
   }
 
-  async updateTaskStatus(id: string, status: string): Promise<Task> {
+  async updateTaskStatus(id: string, status: string): Promise<TaskStatusUpdate> {
     const response = await apiClient.patch(`${this.basePath}/${id}/status`, { status })
     return response.data.data
   }

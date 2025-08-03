@@ -11,11 +11,12 @@
 import { computed } from 'vue'
 
 interface Props {
-  priority: 'low' | 'medium' | 'high' | 'urgent'
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   size?: 'sm' | 'md' | 'lg'
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  priority: 'medium',
   size: 'md'
 })
 
@@ -35,7 +36,7 @@ const colorClasses = computed(() => {
     high: 'bg-orange-100 text-orange-800',
     urgent: 'bg-red-100 text-red-800'
   }
-  return colors[props.priority]
+  return colors[props.priority || 'medium']
 })
 
 const priorityText = computed(() => {
@@ -45,6 +46,6 @@ const priorityText = computed(() => {
     high: 'High',
     urgent: 'Urgent'
   }
-  return texts[props.priority]
+  return texts[props.priority || 'medium']
 })
 </script>
