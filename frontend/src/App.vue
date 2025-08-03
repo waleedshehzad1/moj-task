@@ -1,42 +1,19 @@
 <template>
-  <div id="app">
-    <!-- Navigation -->
-    <Navigation />
+  <div id="app" class="min-h-screen bg-gray-50">
+    <!-- Navigation Header -->
+    <AppHeader />
     
-    <!-- Hero Section -->
-    <Hero />
-    
-    <!-- Features Section -->
-    <Features />
-    
-    <!-- How It Works Section -->
-    <HowItWorks />
-    
-    <!-- Pricing Section -->
-    <Pricing />
-    
-    <!-- Footer -->
-    <Footer />
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <router-view />
+    </main>
   </div>
 </template>
 
-<script>
-import Navigation from './components/Navigation.vue'
-import Hero from './components/Hero.vue'
-import Features from './components/Features.vue'
-import HowItWorks from './components/HowItWorks.vue'
-import Pricing from './components/Pricing.vue'
-import Footer from './components/Footer.vue'
-
-export default {
-  name: 'App',
-  components: {
-    Navigation,
-    Hero,
-    Features,
-    HowItWorks,
-    Pricing,
-    Footer
-  }
-}
+<script setup lang="ts">
+import AppHeader from '@/components/layout/AppHeader.vue'
 </script>
+
+<style>
+/* Global styles are in style.css */
+</style>
