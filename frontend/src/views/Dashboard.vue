@@ -26,30 +26,26 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       <StatsCard
-        v-if="taskStats"
         title="Total Tasks"
-        :value="taskStats.total || 0"
+        :value="taskStats?.total || 0"
         icon="📋"
         color="blue"
       />
       <StatsCard
-        v-if="taskStats"
         title="Pending"
-        :value="taskStats.by_status?.pending || 0"
+        :value="taskStats?.by_status?.pending || 0"
         icon="⏳"
         color="yellow"
       />
       <StatsCard
-        v-if="taskStats"
         title="In Progress"
-        :value="taskStats.by_status?.in_progress || 0"
+        :value="taskStats?.by_status?.in_progress || 0"
         icon="🔄"
         color="blue"
       />
       <StatsCard
-        v-if="taskStats"
         title="Completed"
-        :value="taskStats.by_status?.completed || 0"
+        :value="taskStats?.by_status?.completed || 0"
         icon="✅"
         color="green"
       />
@@ -133,25 +129,25 @@
     </div>
 
     <!-- Performance Overview -->
-    <div v-if="taskStats" class="bg-white shadow rounded-lg">
+    <div class="bg-white shadow rounded-lg">
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Performance Overview</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="text-center">
             <div class="text-3xl font-bold text-green-600">
-              {{ taskStats.completion_rate || 0 }}%
+              {{ taskStats?.completion_rate || 0 }}%
             </div>
             <div class="text-sm text-gray-500">Completion Rate</div>
           </div>
           <div class="text-center">
             <div class="text-3xl font-bold text-red-600">
-              {{ taskStats.overdue || 0 }}
+              {{ taskStats?.overdue || 0 }}
             </div>
             <div class="text-sm text-gray-500">Overdue Tasks</div>
           </div>
           <div class="text-center">
             <div class="text-3xl font-bold text-blue-600">
-              {{ taskStats.by_status?.in_progress || 0 }}
+              {{ taskStats?.by_status?.in_progress || 0 }}
             </div>
             <div class="text-sm text-gray-500">Active Tasks</div>
           </div>
@@ -173,10 +169,17 @@ const taskStore = useTaskStore()
 
 const taskStats = computed(() => taskStore.taskStats)
 const loading = computed(() => taskStore.loading)
-const recentTasks = computed(() => (taskStore.tasks || []).slice(0, 5))
+const recentTasks = computed(() => {
+  return Array.isArray(taskStore.tasks) ? taskStore.tasks.slice(0, 5) : []
+})
 
-const formatDate = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy')
+const formatDate = (date: string | null) => {
+  if (!date) return 'No due date'
+  try {
+    return format(new Date(date), 'MMM dd, yyyy')
+  } catch (error) {
+    return 'Invalid date'
+  }
 }
 
 onMounted(async () => {

@@ -395,8 +395,12 @@ const taskToDelete = ref<string | null>(null)
 const deleteModalMessage = ref('')
 
 // Computed properties
-const tasks = computed(() => taskStore.tasks || [])
-const loading = computed(() => taskStore.loading)
+const tasks = computed(() => {
+  return taskStore.tasks || []
+})
+const loading = computed(() => {
+  return taskStore.loading
+})
 const pagination = computed(() => taskStore.pagination || {
   page: 1,
   limit: 10,
@@ -443,7 +447,7 @@ const loadTasks = async (page?: number) => {
   try {
     const [sortField, sortOrder] = sortBy.value.split(':')
     
-    await taskStore.fetchTasks({
+    const query = {
       search: searchQuery.value || undefined,
       status: statusFilter.value || undefined,
       priority: priorityFilter.value || undefined,
@@ -451,8 +455,11 @@ const loadTasks = async (page?: number) => {
       sort_order: sortOrder as 'asc' | 'desc',
       page: page || pagination.value.page,
       limit: pagination.value.limit
-    })
+    }
+    
+    await taskStore.fetchTasks(query)
   } catch (error) {
+    console.error('TaskList: Failed to load tasks:', error)
     toast.error('Failed to load tasks')
   }
 }

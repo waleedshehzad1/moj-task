@@ -72,7 +72,7 @@ class TaskService {
 
   async getTasks(query: TaskQuery = {}): Promise<PaginatedTasks> {
     const response = await apiClient.get(this.basePath, { params: query })
-    return response.data.data
+    return response.data
   }
 
   async getTask(id: string): Promise<Task> {
