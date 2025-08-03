@@ -782,6 +782,7 @@ class TaskController {
 
       // Get status counts
       const statusCounts = await Task.getStatusCounts();
+      logger.debug('Status counts:', statusCounts);
       
       // Get overdue tasks count
       const overdueCount = await Task.count({
@@ -801,9 +802,14 @@ class TaskController {
       const byStatus = statusCounts.reduce((acc, item) => {
         acc[item.status] = parseInt(item.count);
         return acc;
-      }, {});
+      }, {
+        pending: 0,
+        in_progress: 0,
+        completed: 0,
+        cancelled: 0
+      });
 
-      const stats = {
+      const taskStatsData = {
         total: totalTasks,
         by_status: byStatus,
         overdue: overdueCount,
@@ -813,7 +819,7 @@ class TaskController {
 
       const result = {
         success: true,
-        data: stats,
+        data: taskStatsData,
         timestamp: new Date().toISOString()
       };
 

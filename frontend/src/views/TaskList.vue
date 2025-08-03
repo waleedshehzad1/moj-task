@@ -135,7 +135,7 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="tasks.length === 0" class="text-center py-12">
+      <div v-else-if="(tasks || []).length === 0" class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
@@ -395,9 +395,16 @@ const taskToDelete = ref<string | null>(null)
 const deleteModalMessage = ref('')
 
 // Computed properties
-const tasks = computed(() => taskStore.tasks)
+const tasks = computed(() => taskStore.tasks || [])
 const loading = computed(() => taskStore.loading)
-const pagination = computed(() => taskStore.pagination)
+const pagination = computed(() => taskStore.pagination || {
+  page: 1,
+  limit: 10,
+  total: 0,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false,
+})
 
 const allSelected = computed(() => 
   tasks.value.length > 0 && selectedTasks.value.length === tasks.value.length

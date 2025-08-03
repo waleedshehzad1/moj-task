@@ -28,28 +28,28 @@
       <StatsCard
         v-if="taskStats"
         title="Total Tasks"
-        :value="taskStats.total"
+        :value="taskStats.total || 0"
         icon="📋"
         color="blue"
       />
       <StatsCard
         v-if="taskStats"
         title="Pending"
-        :value="taskStats.by_status.pending"
+        :value="taskStats.by_status?.pending || 0"
         icon="⏳"
         color="yellow"
       />
       <StatsCard
         v-if="taskStats"
         title="In Progress"
-        :value="taskStats.by_status.in_progress"
+        :value="taskStats.by_status?.in_progress || 0"
         icon="🔄"
         color="blue"
       />
       <StatsCard
         v-if="taskStats"
         title="Completed"
-        :value="taskStats.by_status.completed"
+        :value="taskStats.by_status?.completed || 0"
         icon="✅"
         color="green"
       />
@@ -139,19 +139,19 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="text-center">
             <div class="text-3xl font-bold text-green-600">
-              {{ taskStats.completion_rate }}%
+              {{ taskStats.completion_rate || 0 }}%
             </div>
             <div class="text-sm text-gray-500">Completion Rate</div>
           </div>
           <div class="text-center">
             <div class="text-3xl font-bold text-red-600">
-              {{ taskStats.overdue }}
+              {{ taskStats.overdue || 0 }}
             </div>
             <div class="text-sm text-gray-500">Overdue Tasks</div>
           </div>
           <div class="text-center">
             <div class="text-3xl font-bold text-blue-600">
-              {{ taskStats.by_status.in_progress }}
+              {{ taskStats.by_status?.in_progress || 0 }}
             </div>
             <div class="text-sm text-gray-500">Active Tasks</div>
           </div>
@@ -173,7 +173,7 @@ const taskStore = useTaskStore()
 
 const taskStats = computed(() => taskStore.taskStats)
 const loading = computed(() => taskStore.loading)
-const recentTasks = computed(() => taskStore.tasks?.slice(0, 5) || [])
+const recentTasks = computed(() => (taskStore.tasks || []).slice(0, 5))
 
 const formatDate = (date: string) => {
   return format(new Date(date), 'MMM dd, yyyy')

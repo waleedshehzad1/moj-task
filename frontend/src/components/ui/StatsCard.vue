@@ -50,6 +50,7 @@ const colorClasses = computed(() => {
 })
 
 const formattedValue = computed(() => {
-  return new Intl.NumberFormat().format(props.value)
+  const numValue = props.value ?? 0
+  return new Intl.NumberFormat().format(numValue)
 })
 </script>
