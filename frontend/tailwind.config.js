@@ -7,6 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Keep the default gray colors by using extend instead of overriding
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { 
@@ -20,6 +20,19 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Tasks', href: '/tasks', icon: ClipboardDocumentListIcon },
 ]
+
+// Computed property for user display name
+const userDisplayName = computed(() => {
+  if (!authStore.currentUser) return ''
+  
+  const { first_name, last_name, username } = authStore.currentUser
+  
+  if (first_name && last_name) {
+    return `${first_name} ${last_name}`
+  }
+  
+  return username
+})
 
 async function handleLogout() {
   try {
@@ -70,7 +83,7 @@ function closeMobileMenu() {
           <!-- User info -->
           <div class="flex items-center space-x-2 text-sm text-gray-700">
             <UserIcon class="w-5 h-5" />
-            <span>{{ authStore.currentUser?.full_name || authStore.currentUser?.username }}</span>
+            <span>{{ userDisplayName }}</span>
           </div>
           
           <!-- Logout button -->
@@ -126,7 +139,7 @@ function closeMobileMenu() {
           </div>
           <div class="ml-3">
             <div class="text-base font-medium text-gray-800">
-              {{ authStore.currentUser?.full_name || authStore.currentUser?.username }}
+              {{ userDisplayName }}
             </div>
             <div class="text-sm font-medium text-gray-500">
               {{ authStore.currentUser?.email }}
