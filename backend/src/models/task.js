@@ -104,11 +104,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       validate: {
         min: {
-          args: 0,
+          args: [0],
           msg: 'Estimated hours cannot be negative'
         },
         max: {
-          args: 999.99,
+          args: [999.99],
           msg: 'Estimated hours cannot exceed 999.99'
         }
       },
@@ -119,11 +119,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       validate: {
         min: {
-          args: 0,
+          args: [0],
           msg: 'Actual hours cannot be negative'
         },
         max: {
-          args: 999.99,
+          args: [999.99],
           msg: 'Actual hours cannot exceed 999.99'
         }
       },

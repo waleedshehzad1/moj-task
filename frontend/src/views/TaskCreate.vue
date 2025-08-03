@@ -282,6 +282,11 @@ const isFormValid = computed(() => {
 })
 
 // Methods
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return uuidRegex.test(uuid)
+}
+
 const validateForm = (): boolean => {
   // Clear previous errors
   Object.keys(errors).forEach(key => delete errors[key])
@@ -351,12 +356,18 @@ const submitForm = async () => {
     // Build metadata from fields
     form.metadata = buildMetadata()
 
+    // Prepare form data - convert assigned_to to null if it's not a UUID or is empty
+    const formData = { ...form }
+    if (!formData.assigned_to || !isValidUUID(formData.assigned_to)) {
+      ;(formData as any).assigned_to = null
+    }
+
     if (isEdit.value) {
-      await taskStore.updateTask(taskId.value, form)
+      await taskStore.updateTask(taskId.value, formData)
       toast.success('Task updated successfully')
       router.push(`/tasks/${taskId.value}`)
     } else {
-      const newTask = await taskStore.createTask(form)
+      const newTask = await taskStore.createTask(formData)
       toast.success('Task created successfully')
       router.push(`/tasks/${newTask.id}`)
     }
