@@ -282,14 +282,14 @@
     <div v-if="pagination.totalPages > 1" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow">
       <div class="flex-1 flex justify-between sm:hidden">
         <button
-          :disabled="!pagination.hasPrev"
+          :disabled="!pagination.hasPreviousPage"
           @click="changePage(pagination.page - 1)"
           class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
         <button
-          :disabled="!pagination.hasNext"
+          :disabled="!pagination.hasNextPage"
           @click="changePage(pagination.page + 1)"
           class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -313,7 +313,7 @@
         <div>
           <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
             <button
-              :disabled="!pagination.hasPrev"
+              :disabled="!pagination.hasPreviousPage"
               @click="changePage(pagination.page - 1)"
               class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -331,7 +331,7 @@
               </button>
               <button
                 v-else
-                @click="changePage(page)"
+                @click="changePage(Number(page))"
                 class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium"
                 :class="page === pagination.page 
                   ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' 
@@ -342,7 +342,7 @@
             </template>
             
             <button
-              :disabled="!pagination.hasNext"
+              :disabled="!pagination.hasNextPage"
               @click="changePage(pagination.page + 1)"
               class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -432,7 +432,7 @@ const visiblePages = computed(() => {
 })
 
 // Methods
-const loadTasks = async () => {
+const loadTasks = async (page?: number) => {
   try {
     const [sortField, sortOrder] = sortBy.value.split(':')
     
@@ -442,7 +442,7 @@ const loadTasks = async () => {
       priority: priorityFilter.value || undefined,
       sort_by: sortField,
       sort_order: sortOrder as 'asc' | 'desc',
-      page: pagination.value.page,
+      page: page || pagination.value.page,
       limit: pagination.value.limit
     })
   } catch (error) {
@@ -451,18 +451,15 @@ const loadTasks = async () => {
 }
 
 const debouncedSearch = debounce(async () => {
-  pagination.value.page = 1
-  await loadTasks()
+  await loadTasks(1) // Reset to page 1 when searching
 }, 300)
 
 const applyFilters = async () => {
-  pagination.value.page = 1
-  await loadTasks()
+  await loadTasks(1) // Reset to page 1 when applying filters
 }
 
 const changePage = async (page: number) => {
-  pagination.value.page = page
-  await loadTasks()
+  await loadTasks(page)
 }
 
 const toggleSelectAll = () => {

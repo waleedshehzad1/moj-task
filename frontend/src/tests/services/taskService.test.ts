@@ -35,8 +35,8 @@ const mockTasksResponse = {
       limit: 10,
       total: 1,
       totalPages: 1,
-      hasNext: false,
-      hasPrev: false
+      hasNextPage: false,
+      hasPreviousPage: false
     }
   }
 }

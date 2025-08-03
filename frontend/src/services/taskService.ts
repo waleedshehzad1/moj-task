@@ -50,8 +50,8 @@ export interface PaginatedTasks {
     limit: number
     total: number
     totalPages: number
-    hasNext: boolean
-    hasPrev: boolean
+    hasNextPage: boolean
+    hasPreviousPage: boolean
   }
 }
 

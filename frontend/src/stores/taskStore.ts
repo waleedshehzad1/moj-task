@@ -14,8 +14,8 @@ export const useTaskStore = defineStore('task', () => {
     limit: 10,
     total: 0,
     totalPages: 0,
-    hasNext: false,
-    hasPrev: false,
+    hasNextPage: false,
+    hasPreviousPage: false,
   })
 
   // Getters

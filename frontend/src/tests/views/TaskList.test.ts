@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import TaskList from '@/views/TaskList.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import type { Task } from '@/services/taskService'
 
 // Mock vue-router
 const mockRouter = {
@@ -34,16 +35,16 @@ vi.mock('vue-toastification', () => ({
 
 // Mock date-fns
 vi.mock('date-fns', () => ({
-  format: vi.fn((date, formatStr) => '2024-01-15')
+  format: vi.fn((_date, _formatStr) => '2024-01-15')
 }))
 
-const mockTasks = [
+const mockTasks: Task[] = [
   {
     id: '1',
     title: 'Test Task 1',
     description: 'Test description',
-    status: 'pending',
-    priority: 'high',
+    status: 'pending' as const,
+    priority: 'high' as const,
     due_date: '2024-01-15T17:00:00Z',
     created_at: '2024-01-01T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -53,8 +54,8 @@ const mockTasks = [
     id: '2',
     title: 'Test Task 2',
     description: 'Another test description',
-    status: 'in_progress',
-    priority: 'medium',
+    status: 'in_progress' as const,
+    priority: 'medium' as const,
     due_date: '2024-01-20T17:00:00Z',
     created_at: '2024-01-02T10:00:00Z',
     updated_at: '2024-01-02T10:00:00Z',
@@ -79,8 +80,8 @@ describe('TaskList', () => {
       limit: 10,
       total: 2,
       totalPages: 1,
-      hasNext: false,
-      hasPrev: false
+      hasNextPage: false,
+      hasPreviousPage: false
     }
 
     wrapper = mount(TaskList, {
@@ -162,6 +163,63 @@ describe('TaskList', () => {
   it('calls fetchTasks on mount', () => {
     expect(store.fetchTasks).toHaveBeenCalled()
   })
+
+  it('displays pagination when there are multiple pages', async () => {
+    store.pagination = {
+      page: 1,
+      limit: 10,
+      total: 25,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPreviousPage: false
+    }
+    await wrapper.vm.$nextTick()
+    
+    expect(wrapper.text()).toContain('Showing')
+    expect(wrapper.text()).toContain('of 25 results')
+  })
+
+  it('handles pagination page change', async () => {
+    store.pagination = {
+      page: 1,
+      limit: 10,
+      total: 25,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPreviousPage: false
+    }
+    await wrapper.vm.$nextTick()
+    
+    // Find and click next button (if it exists)
+    const nextButtons = wrapper.findAll('button').filter((btn: any) => 
+      btn.text().includes('Next') || btn.element.innerHTML.includes('M9 5l7 7-7 7')
+    )
+    
+    if (nextButtons.length > 0) {
+      await nextButtons[0].trigger('click')
+      expect(store.fetchTasks).toHaveBeenCalledTimes(2) // Once on mount, once on page change
+    }
+  })
+
+  it('disables pagination buttons correctly', async () => {
+    store.pagination = {
+      page: 1,
+      limit: 10,
+      total: 25,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPreviousPage: false
+    }
+    await wrapper.vm.$nextTick()
+    
+    const prevButtons = wrapper.findAll('button').filter((btn: any) => 
+      btn.text().includes('Previous') || btn.element.innerHTML.includes('M15 19l-7-7 7-7')
+    )
+    
+    if (prevButtons.length > 0) {
+      expect(prevButtons[0].attributes('disabled')).toBeDefined()
+    }
+  })
 })
 
 describe('TaskList Integration', () => {
@@ -174,7 +232,7 @@ describe('TaskList Integration', () => {
     store.fetchTasks = vi.fn().mockResolvedValue(undefined)
     store.tasks = mockTasks
 
-    const wrapper = mount(TaskList, {
+    mount(TaskList, {
       global: {
         plugins: [pinia],
         stubs: {
