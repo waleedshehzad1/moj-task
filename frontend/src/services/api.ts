@@ -1,5 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { useToast } from 'vue-toastification'
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 
@@ -14,7 +13,7 @@ const apiClient: AxiosInstance = axios.create({
 
 // Request interceptor
 apiClient.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('authToken')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
@@ -30,17 +29,29 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
-    const toast = useToast()
-    
+    // Handle errors with console logging and optional toast notifications
     if (error.response?.status === 401) {
       localStorage.removeItem('authToken')
-      toast.error('Authentication failed. Please login again.')
+      console.error('Authentication failed')
+      // Dispatch custom event for authentication failure that components can listen to
+      window.dispatchEvent(new CustomEvent('auth-error', { 
+        detail: 'Authentication failed. Please login again.' 
+      }))
     } else if (error.response?.status >= 500) {
-      toast.error('Server error. Please try again later.')
+      console.error('Server error:', error.response?.data)
+      window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: 'Server error. Please try again later.' 
+      }))
     } else if (error.response?.data?.message) {
-      toast.error(error.response.data.message)
+      console.error('API error:', error.response.data.message)
+      window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: error.response.data.message 
+      }))
     } else {
-      toast.error('An unexpected error occurred.')
+      console.error('Unexpected error:', error)
+      window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: 'An unexpected error occurred.' 
+      }))
     }
     
     return Promise.reject(error)

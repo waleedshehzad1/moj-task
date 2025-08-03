@@ -12,6 +12,10 @@
 
 <script setup lang="ts">
 import AppHeader from '@/components/layout/AppHeader.vue'
+import { useApiErrorHandler } from '@/composables/useApiErrorHandler'
+
+// Set up global API error handling
+useApiErrorHandler()
 </script>
 
 <style>
