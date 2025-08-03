@@ -9,61 +9,76 @@ module.exports = {
     const caseworkerPassword = await bcrypt.hash('Caseworker123!@#', 12);
     const viewerPassword = await bcrypt.hash('Viewer123!@#', 12);
 
-    await queryInterface.bulkInsert('Users', [
+    await queryInterface.bulkInsert('users', [
       {
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        username: 'admin',
         email: 'admin@hmcts.gov.uk',
-        password: hashedPassword,
-        firstName: 'System',
-        lastName: 'Administrator',
+        password_hash: hashedPassword,
+        first_name: 'System',
+        last_name: 'Administrator',
         role: 'admin',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        department: 'IT',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
       },
       {
+        id: '550e8400-e29b-41d4-a716-446655440002',
+        username: 'manager1',
         email: 'manager@hmcts.gov.uk',
-        password: managerPassword,
-        firstName: 'Task',
-        lastName: 'Manager',
+        password_hash: managerPassword,
+        first_name: 'Task',
+        last_name: 'Manager',
         role: 'manager',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        department: 'Case Management',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
       },
       {
+        id: '550e8400-e29b-41d4-a716-446655440003',
+        username: 'jsmith',
         email: 'caseworker1@hmcts.gov.uk',
-        password: caseworkerPassword,
-        firstName: 'John',
-        lastName: 'Smith',
+        password_hash: caseworkerPassword,
+        first_name: 'John',
+        last_name: 'Smith',
         role: 'caseworker',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        department: 'Case Management',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
       },
       {
+        id: '550e8400-e29b-41d4-a716-446655440004',
+        username: 'sjones',
         email: 'caseworker2@hmcts.gov.uk',
-        password: caseworkerPassword,
-        firstName: 'Sarah',
-        lastName: 'Jones',
+        password_hash: caseworkerPassword,
+        first_name: 'Sarah',
+        last_name: 'Jones',
         role: 'caseworker',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        department: 'Case Management',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
       },
       {
+        id: '550e8400-e29b-41d4-a716-446655440005',
+        username: 'viewer1',
         email: 'viewer@hmcts.gov.uk',
-        password: viewerPassword,
-        firstName: 'Read',
-        lastName: 'Only',
+        password_hash: viewerPassword,
+        first_name: 'Read',
+        last_name: 'Only',
         role: 'viewer',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        department: 'Audit',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     ], {});
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete('Users', null, {});
+    await queryInterface.bulkDelete('users', null, {});
   }
 };

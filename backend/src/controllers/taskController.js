@@ -84,7 +84,7 @@ class TaskController {
       logger.logPerformance('CREATE_TASK', duration, { taskId: task.id });
 
       // Invalidate relevant caches
-      await this.invalidateTaskCaches();
+      await TaskController.invalidateTaskCaches();
 
       // Log audit event
       logger.logAudit('TASK_CREATED', {
@@ -515,7 +515,7 @@ class TaskController {
       });
 
       // Invalidate caches
-      await this.invalidateTaskCaches(id);
+      await TaskController.invalidateTaskCaches(id);
 
       // Log performance
       const endTime = process.hrtime.bigint();
@@ -632,7 +632,7 @@ class TaskController {
       await task.update(updateData);
 
       // Invalidate caches
-      await this.invalidateTaskCaches(id);
+      await TaskController.invalidateTaskCaches(id);
 
       // Log performance
       const endTime = process.hrtime.bigint();
@@ -724,7 +724,7 @@ class TaskController {
       await task.destroy();
 
       // Invalidate caches
-      await this.invalidateTaskCaches(id);
+      await TaskController.invalidateTaskCaches(id);
 
       // Log performance
       const endTime = process.hrtime.bigint();

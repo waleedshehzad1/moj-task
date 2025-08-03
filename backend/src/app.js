@@ -18,9 +18,9 @@ const { connectRedis } = require('./config/redis');
 const { syncDatabase } = require('./models');
 
 // Import security middleware
-const sanitizeInput = require('./middleware/sanitizeInput');
-const validateApiKey = require('./middleware/validateApiKey');
-const auditLogger = require('./middleware/auditLogger');
+const { sanitizeInput } = require('./middleware/sanitizeInput');
+const { validateApiKey } = require('./middleware/validateApiKey');
+const { auditLogger } = require('./middleware/auditLogger');
 
 class Application {
   constructor() {
@@ -68,7 +68,8 @@ class Application {
     const speedLimiter = slowDown({
       windowMs: 15 * 60 * 1000, // 15 minutes
       delayAfter: 50, // allow 50 requests per windowMs without delay
-      delayMs: 100 // add 100ms delay per request after delayAfter
+      delayMs: () => 100, // fixed function format for v2
+      validate: { delayMs: false } // disable warning
     });
 
     this.app.use(limiter);

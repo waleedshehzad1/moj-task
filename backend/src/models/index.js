@@ -91,10 +91,10 @@ const syncDatabase = async (force = false) => {
       throw new Error('Database connection failed');
     }
 
-    // Sync models
+    // Sync models (don't alter since we use migrations)
     await sequelize.sync({ 
       force,
-      alter: process.env.NODE_ENV === 'development'
+      alter: false // Disable alter since we use migrations
     });
     
     logger.info('Database synchronized successfully');
