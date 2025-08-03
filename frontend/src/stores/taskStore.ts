@@ -19,15 +19,15 @@ export const useTaskStore = defineStore('task', () => {
   })
 
   // Getters
-  const pendingTasks = computed(() => tasks.value.filter(task => task.status === 'pending'))
-  const inProgressTasks = computed(() => tasks.value.filter(task => task.status === 'in_progress'))
-  const completedTasks = computed(() => tasks.value.filter(task => task.status === 'completed'))
+  const pendingTasks = computed(() => Array.isArray(tasks.value) ? tasks.value.filter(task => task.status === 'pending') : [])
+  const inProgressTasks = computed(() => Array.isArray(tasks.value) ? tasks.value.filter(task => task.status === 'in_progress') : [])
+  const completedTasks = computed(() => Array.isArray(tasks.value) ? tasks.value.filter(task => task.status === 'completed') : [])
   const overdueTasks = computed(() => 
-    tasks.value.filter(task => 
-      new Date(task.due_date) < new Date() && 
+    Array.isArray(tasks.value) ? tasks.value.filter(task => 
+      task.due_date && new Date(task.due_date) < new Date() && 
       task.status !== 'completed' && 
       task.status !== 'cancelled'
-    )
+    ) : []
   )
 
   // Actions
@@ -36,8 +36,15 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       const response = await taskService.getTasks(query)
-      tasks.value = response.data
-      pagination.value = response.pagination
+      tasks.value = Array.isArray(response.data) ? response.data : []
+      pagination.value = response.pagination || {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      }
     } catch (err: any) {
       error.value = err.message || 'Failed to fetch tasks'
       throw err
@@ -65,6 +72,10 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       const newTask = await taskService.createTask(taskData)
+      // Ensure tasks.value is an array before calling unshift
+      if (!Array.isArray(tasks.value)) {
+        tasks.value = []
+      }
       tasks.value.unshift(newTask)
       return newTask
     } catch (err: any) {
@@ -118,7 +129,12 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       await taskService.deleteTask(id)
-      tasks.value = tasks.value.filter(task => task.id !== id)
+      // Ensure tasks.value is an array before calling filter
+      if (!Array.isArray(tasks.value)) {
+        tasks.value = []
+      } else {
+        tasks.value = tasks.value.filter(task => task.id !== id)
+      }
       if (currentTask.value?.id === id) {
         currentTask.value = null
       }
