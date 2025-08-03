@@ -23,6 +23,7 @@
             <TaskStatusBadge :status="task.status" />
             <TaskPriorityBadge :priority="task.priority" />
             <span 
+              v-if="task.due_date"
               class="text-sm text-gray-500"
               :class="{ 'text-red-600 font-medium': isOverdue }"
             >
@@ -89,7 +90,7 @@
               </dd>
             </div>
             
-            <div>
+            <div v-if="task.due_date">
               <dt class="text-sm font-medium text-gray-500">Due Date</dt>
               <dd class="mt-1 text-sm text-gray-900">
                 <span :class="{ 'text-red-600 font-medium': isOverdue }">
@@ -282,7 +283,7 @@ const task = computed(() => taskStore.currentTask)
 const loading = computed(() => taskStore.loading)
 
 const isOverdue = computed(() => {
-  if (!task.value) return false
+  if (!task.value || !task.value.due_date) return false
   return new Date(task.value.due_date) < new Date() && 
          task.value.status !== 'completed' && 
          task.value.status !== 'cancelled'
@@ -331,11 +332,17 @@ const cancelDelete = () => {
 }
 
 const formatDate = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy')
+  if (!date) return 'N/A'
+  const dateObj = new Date(date)
+  if (isNaN(dateObj.getTime())) return 'Invalid Date'
+  return format(dateObj, 'MMM dd, yyyy')
 }
 
 const formatDateTime = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy HH:mm')
+  if (!date) return 'N/A'
+  const dateObj = new Date(date)
+  if (isNaN(dateObj.getTime())) return 'Invalid Date'
+  return format(dateObj, 'MMM dd, yyyy HH:mm')
 }
 
 // Lifecycle
