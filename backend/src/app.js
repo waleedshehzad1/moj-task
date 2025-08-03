@@ -75,9 +75,9 @@ class Application {
     this.app.use(limiter);
     this.app.use(speedLimiter);
 
-    // CORS configuration
+    // CORS configuration - Allow all origins
     this.app.use(cors({
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+      origin: true, // Allow all origins
       credentials: process.env.CORS_CREDENTIALS === 'true',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']

@@ -108,8 +108,8 @@ locals {
     DYNATRACE_ENABLED        = "true"
     DYNATRACE_TENANT_ID      = var.dynatrace_tenant_id
     
-    # Security settings
-    CORS_ORIGIN              = var.cors_origin
+    # Security settings - Allow all origins
+    CORS_ORIGIN              = "*"
     CORS_CREDENTIALS         = "true"
     
     # Logging settings

@@ -161,8 +161,8 @@ HEALTH_CHECK_INTERVAL=30000
 SWAGGER_ENABLED=true
 SWAGGER_TITLE=HMCTS Task Management API
 
-# CORS Configuration
-CORS_ORIGIN=http://localhost:3001
+# CORS Configuration - Allow all origins
+CORS_ORIGIN=*
 CORS_CREDENTIALS=true
 
 # API Key Encryption

@@ -356,8 +356,8 @@ JWT_REFRESH_EXPIRES_IN=7d
 RATE_LIMIT_WINDOW_MS=900000  # 15 minutes
 RATE_LIMIT_MAX_REQUESTS=100
 
-# CORS configuration
-CORS_ORIGIN=http://localhost:3001
+# CORS configuration - Allow all origins
+CORS_ORIGIN=*
 CORS_CREDENTIALS=true
 ```
 
