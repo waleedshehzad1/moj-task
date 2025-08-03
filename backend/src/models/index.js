@@ -14,6 +14,16 @@ const sequelize = new Sequelize(
     ...dbConfig,
     logging: dbConfig.logging ? (msg) => logger.logDatabase('Query', 'all', { query: msg }) : false,
     benchmark: true,
+    retry: {
+      max: 3,
+      match: [
+        /ECONNRESET/,
+        /ENOTFOUND/,
+        /ECONNREFUSED/,
+        /ETIMEDOUT/,
+        /TimeoutError/
+      ]
+    },
     hooks: {
       beforeConnect: () => {
         logger.info('Attempting to connect to database...');

@@ -11,9 +11,10 @@ module.exports = {
     logging: process.env.DB_LOGGING === 'true' ? console.log : false,
     pool: {
       max: 20,
-      min: 0,
+      min: 2,
       acquire: 30000,
-      idle: 10000
+      idle: 300000, // 5 minutes instead of 10 seconds
+      evict: 60000   // How often to check for idle connections
     },
     define: {
       timestamps: true,
@@ -37,9 +38,10 @@ module.exports = {
     logging: false,
     pool: {
       max: 5,
-      min: 0,
+      min: 1,
       acquire: 30000,
-      idle: 10000
+      idle: 300000, // 5 minutes instead of 10 seconds
+      evict: 60000   // How often to check for idle connections
     },
     define: {
       timestamps: true,
@@ -59,7 +61,8 @@ module.exports = {
       max: 50,
       min: 5,
       acquire: 60000,
-      idle: 10000
+      idle: 600000, // 10 minutes for production
+      evict: 120000  // How often to check for idle connections
     },
     define: {
       timestamps: true,

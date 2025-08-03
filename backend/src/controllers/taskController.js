@@ -844,17 +844,33 @@ class TaskController {
    */
   static async invalidateTaskCaches(taskId = null) {
     try {
-      // Invalidate list caches
+      // Invalidate task statistics cache
       await redisClient.del('task:stats');
       
       // Invalidate specific task cache if provided
       if (taskId) {
-        await redisClient.cacheDel(taskId);
+        const taskCacheKey = `task:${taskId}`;
+        await redisClient.cacheDel(taskCacheKey);
+        logger.debug(`Invalidated individual task cache: ${taskCacheKey}`);
       }
 
-      // In a real application, you might want to invalidate
-      // all task list caches based on patterns
-      logger.debug('Task caches invalidated', { taskId });
+      // Invalidate all task list caches (with pattern matching)
+      try {
+        const client = redisClient.client;
+        if (client && client.keys) {
+          // Get all cache keys that match task list patterns
+          const listCacheKeys = await client.keys('cache:tasks:list:*');
+          if (listCacheKeys.length > 0) {
+            await client.del(...listCacheKeys);
+            logger.debug(`Invalidated ${listCacheKeys.length} task list cache entries`);
+          }
+        }
+      } catch (patternError) {
+        logger.warn('Could not invalidate task list caches with pattern matching:', patternError);
+        // Fallback: just log the warning and continue
+      }
+
+      logger.debug('Task caches invalidated successfully', { taskId });
     } catch (error) {
       logger.error('Error invalidating task caches:', error);
     }
