@@ -160,7 +160,7 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { format } from 'date-fns'
+import { formatDate } from '@/utils/dateUtils'
 import StatsCard from '@/components/ui/StatsCard.vue'
 import TaskStatusBadge from '@/components/ui/TaskStatusBadge.vue'
 import TaskPriorityBadge from '@/components/ui/TaskPriorityBadge.vue'
@@ -172,15 +172,6 @@ const loading = computed(() => taskStore.loading)
 const recentTasks = computed(() => {
   return Array.isArray(taskStore.tasks) ? taskStore.tasks.slice(0, 5) : []
 })
-
-const formatDate = (date: string | null) => {
-  if (!date) return 'No due date'
-  try {
-    return format(new Date(date), 'MMM dd, yyyy')
-  } catch (error) {
-    return 'Invalid date'
-  }
-}
 
 onMounted(async () => {
   try {

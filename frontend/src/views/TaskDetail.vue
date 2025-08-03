@@ -266,7 +266,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useTaskStore } from '@/stores/taskStore'
-import { format } from 'date-fns'
+import { formatDate, formatDateTime } from '@/utils/dateUtils'
 import TaskStatusBadge from '@/components/ui/TaskStatusBadge.vue'
 import TaskPriorityBadge from '@/components/ui/TaskPriorityBadge.vue'
 import ConfirmationModal from '@/components/ui/ConfirmationModal.vue'
@@ -284,10 +284,16 @@ const loading = computed(() => taskStore.loading)
 
 const isOverdue = computed(() => {
   if (!task.value || !task.value.due_date) return false
-  return new Date(task.value.due_date) < new Date() && 
+  
+  const dueDate = new Date(task.value.due_date)
+  if (isNaN(dueDate.getTime())) return false
+  
+  return dueDate < new Date() && 
          task.value.status !== 'completed' && 
          task.value.status !== 'cancelled'
 })
+
+// Methods
 
 // Methods
 const loadTask = async () => {
@@ -329,20 +335,6 @@ const confirmDelete = async () => {
 
 const cancelDelete = () => {
   showDeleteModal.value = false
-}
-
-const formatDate = (date: string) => {
-  if (!date) return 'N/A'
-  const dateObj = new Date(date)
-  if (isNaN(dateObj.getTime())) return 'Invalid Date'
-  return format(dateObj, 'MMM dd, yyyy')
-}
-
-const formatDateTime = (date: string) => {
-  if (!date) return 'N/A'
-  const dateObj = new Date(date)
-  if (isNaN(dateObj.getTime())) return 'Invalid Date'
-  return format(dateObj, 'MMM dd, yyyy HH:mm')
 }
 
 // Lifecycle

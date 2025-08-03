@@ -206,7 +206,7 @@
                     <TaskStatusBadge :status="task.status" />
                     
                     <!-- Due Date -->
-                    <div class="text-sm text-gray-500">
+                    <div v-if="task.due_date" class="text-sm text-gray-500">
                       <div class="flex items-center">
                         <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -373,7 +373,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useTaskStore } from '@/stores/taskStore'
-import { format } from 'date-fns'
+import { formatDate, isTaskOverdue } from '@/utils/dateUtils'
 import TaskStatusBadge from '@/components/ui/TaskStatusBadge.vue'
 import TaskPriorityBadge from '@/components/ui/TaskPriorityBadge.vue'
 import ConfirmationModal from '@/components/ui/ConfirmationModal.vue'
@@ -541,14 +541,8 @@ const bulkDelete = () => {
   showDeleteModal.value = true
 }
 
-const formatDate = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy')
-}
-
 const isOverdue = (task: any) => {
-  return new Date(task.due_date) < new Date() && 
-         task.status !== 'completed' && 
-         task.status !== 'cancelled'
+  return isTaskOverdue(task)
 }
 
 // Close dropdown when clicking outside

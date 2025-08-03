@@ -301,8 +301,13 @@ const validateForm = (): boolean => {
   // Due date validation
   if (!form.due_date) {
     errors.due_date = 'Due date is required'
-  } else if (new Date(form.due_date) < new Date()) {
-    errors.due_date = 'Due date cannot be in the past'
+  } else {
+    const dueDate = new Date(form.due_date)
+    if (isNaN(dueDate.getTime())) {
+      errors.due_date = 'Invalid date format'
+    } else if (dueDate < new Date()) {
+      errors.due_date = 'Due date cannot be in the past'
+    }
   }
 
   // Estimated hours validation
@@ -387,7 +392,7 @@ const loadTask = async () => {
       form.description = task.description || ''
       form.status = task.status
       form.priority = task.priority
-      form.due_date = task.due_date.slice(0, 16) // Format for datetime-local input
+      form.due_date = task.due_date ? task.due_date.slice(0, 16) : '' // Format for datetime-local input
       form.assigned_to = task.assigned_to || ''
       form.estimated_hours = task.estimated_hours
       form.tags = task.tags ? [...task.tags] : []
