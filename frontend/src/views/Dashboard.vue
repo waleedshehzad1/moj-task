@@ -173,7 +173,7 @@ const taskStore = useTaskStore()
 
 const taskStats = computed(() => taskStore.taskStats)
 const loading = computed(() => taskStore.loading)
-const recentTasks = computed(() => taskStore.tasks.slice(0, 5))
+const recentTasks = computed(() => taskStore.tasks?.slice(0, 5) || [])
 
 const formatDate = (date: string) => {
   return format(new Date(date), 'MMM dd, yyyy')

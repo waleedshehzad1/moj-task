@@ -797,15 +797,18 @@ class TaskController {
         where: { is_archived: false }
       });
 
+      // Build status counts object
+      const byStatus = statusCounts.reduce((acc, item) => {
+        acc[item.status] = parseInt(item.count);
+        return acc;
+      }, {});
+
       const stats = {
         total: totalTasks,
-        by_status: statusCounts.reduce((acc, item) => {
-          acc[item.status] = parseInt(item.count);
-          return acc;
-        }, {}),
+        by_status: byStatus,
         overdue: overdueCount,
         completion_rate: totalTasks > 0 ? 
-          Math.round((stats.by_status?.completed || 0) / totalTasks * 100) : 0
+          Math.round((byStatus?.completed || 0) / totalTasks * 100) : 0
       };
 
       const result = {
