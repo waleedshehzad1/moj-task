@@ -16,6 +16,7 @@ const swaggerSpec = require('./config/swagger');
 const routes = require('./routes');
 const { connectRedis } = require('./config/redis');
 const { syncDatabase } = require('./models');
+const { setupDatabase } = require('./database/setup');
 
 // Import security middleware
 const { sanitizeInput } = require('./middleware/sanitizeInput');
@@ -237,7 +238,11 @@ class Application {
 
   async start() {
     try {
-      // Initialize database
+      // Setup database - Run migrations and seeders
+      await setupDatabase();
+      logger.info('Database setup completed with test users');
+      
+      // Initialize database connection
       await syncDatabase();
       logger.info('Database synchronized successfully');
 

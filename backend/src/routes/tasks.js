@@ -1,9 +1,10 @@
 const express = require('express');
 const TaskController = require('../controllers/taskController');
+const { authenticateJWT, requirePermission, requireRole } = require('../middleware/authMiddleware');
 const { 
   validateBody, 
-  validateQuery, 
-  validateParams 
+  validateQuery,
+  validateParams
 } = require('../validation');
 const {
   createTaskSchema,
@@ -71,7 +72,7 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/stats', TaskController.getTaskStats);
+router.get('/stats', authenticateJWT, requirePermission('read'), TaskController.getTaskStats);
 
 /**
  * @swagger
@@ -134,6 +135,8 @@ router.get('/stats', TaskController.getTaskStats);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.post('/', 
+  authenticateJWT,
+  requirePermission('create'),
   validateBody(createTaskSchema),
   TaskController.createTask
 );
@@ -254,6 +257,8 @@ router.post('/',
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/',
+  authenticateJWT,
+  requirePermission('read'),
   validateQuery(taskQuerySchema),
   TaskController.getAllTasks
 );
@@ -299,6 +304,8 @@ router.get('/',
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/:id',
+  authenticateJWT,
+  requirePermission('read'),
   validateParams(taskIdSchema),
   TaskController.getTaskById
 );
@@ -413,6 +420,8 @@ router.get('/:id',
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.put('/:id',
+  authenticateJWT,
+  requirePermission('update'),
   validateParams(taskIdSchema),
   validateBody(updateTaskSchema),
   TaskController.updateTask
@@ -512,6 +521,8 @@ router.put('/:id',
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.patch('/:id/status',
+  authenticateJWT,
+  requirePermission('update'),
   validateParams(taskIdSchema),
   validateBody(updateTaskStatusSchema),
   TaskController.updateTaskStatus
@@ -569,6 +580,8 @@ router.patch('/:id/status',
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.delete('/:id',
+  authenticateJWT,
+  requirePermission('delete'),
   validateParams(taskIdSchema),
   TaskController.deleteTask
 );

@@ -16,6 +16,7 @@
     "db:migrate": "npx sequelize-cli db:migrate",
     "db:seed": "npx sequelize-cli db:seed:all",
     "db:reset": "npx sequelize-cli db:drop && npx sequelize-cli db:create && npm run db:migrate && npm run db:seed",
+    "setup": "npm run db:migrate && npm run db:seed",
     "docker:build": "docker build -t hmcts-task-api .",
     "docker:run": "docker run -p 3000:3000 hmcts-task-api",
     "security:audit": "npm audit",

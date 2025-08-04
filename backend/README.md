@@ -47,6 +47,18 @@ Enterprise-grade backend API for HMCTS (Her Majesty's Courts and Tribunals Servi
 - **Progressive Delays**: Slow down repeated suspicious requests
 - **API Key Management**: Secure service-to-service authentication
 
+## 👥 Test Users for Quick Login
+
+The application is pre-seeded with the following test users for quick testing:
+
+| Role | Username | Email | Password | Permissions |
+|------|----------|-------|----------|-------------|
+| **Admin** | `admin` | admin@hmcts.gov.uk | Admin123!@# | All permissions |
+| **Manager** | `manager1` | manager@hmcts.gov.uk | Manager123!@# | Create, read, update, delete tasks |
+| **Caseworker** | `jsmith` | caseworker1@hmcts.gov.uk | Caseworker123!@# | Create, read, update tasks |
+| **Caseworker** | `sjones` | caseworker2@hmcts.gov.uk | Caseworker123!@# | Create, read, update tasks |
+| **Viewer** | `viewer1` | viewer@hmcts.gov.uk | Viewer123!@# | Read tasks only |
+
 ## �📋 Core Features
 
 ### Task Management

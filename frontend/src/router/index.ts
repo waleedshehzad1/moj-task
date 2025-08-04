@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import authStore from '@/stores/authStore'
 
 // Lazy load components
+const Login = () => import('@/views/Login.vue')
 const Dashboard = () => import('@/views/Dashboard.vue')
 const TaskList = () => import('@/views/TaskList.vue')
 const TaskDetail = () => import('@/views/TaskDetail.vue')
@@ -10,11 +12,21 @@ const TaskEdit = () => import('@/views/TaskEdit.vue')
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: {
+      title: 'Sign In',
+      requiresAuth: false
+    }
+  },
+  {
     path: '/',
     name: 'Dashboard',
     component: Dashboard,
     meta: {
-      title: 'Dashboard'
+      title: 'Dashboard',
+      requiresAuth: true
     }
   },
   {
@@ -22,7 +34,8 @@ const routes: RouteRecordRaw[] = [
     name: 'TaskList',
     component: TaskList,
     meta: {
-      title: 'Tasks'
+      title: 'Tasks',
+      requiresAuth: true
     }
   },
   {
@@ -30,7 +43,8 @@ const routes: RouteRecordRaw[] = [
     name: 'TaskCreate',
     component: TaskCreate,
     meta: {
-      title: 'Create Task'
+      title: 'Create Task',
+      requiresAuth: true
     }
   },
   {
@@ -38,7 +52,8 @@ const routes: RouteRecordRaw[] = [
     name: 'TaskDetail',
     component: TaskDetail,
     meta: {
-      title: 'Task Details'
+      title: 'Task Details',
+      requiresAuth: true
     }
   },
   {
@@ -46,7 +61,8 @@ const routes: RouteRecordRaw[] = [
     name: 'TaskEdit',
     component: TaskEdit,
     meta: {
-      title: 'Edit Task'
+      title: 'Edit Task',
+      requiresAuth: true
     }
   },
   {
@@ -67,12 +83,27 @@ const router = createRouter({
   }
 })
 
-// Global navigation guard for setting page titles
+// Global navigation guard for authentication and page titles
 router.beforeEach((to, _from, next) => {
+  // Set page title
   if (to.meta.title) {
     document.title = `${to.meta.title} - Task Management`
   }
-  next()
+  
+  // Check if route requires authentication
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const isAuthenticated = authStore.state.isAuthenticated
+  
+  if (requiresAuth && !isAuthenticated) {
+    // Redirect to login if authentication is required but user is not authenticated
+    next({ name: 'Login' })
+  } else if (to.name === 'Login' && isAuthenticated) {
+    // Redirect to dashboard if user is already authenticated and tries to access login
+    next({ name: 'Dashboard' })
+  } else {
+    // Proceed as normal
+    next()
+  }
 })
 
 export default router

@@ -1,5 +1,6 @@
 const express = require('express');
 const tasksRouter = require('./tasks');
+const authRouter = require('./auth');
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.get('/', (req, res) => {
     api_version: process.env.API_VERSION || 'v1',
     documentation: `/api-docs`,
     endpoints: {
+      auth: '/api/v1/auth',
       tasks: '/api/v1/tasks',
       health: '/health',
       docs: '/api-docs'
@@ -51,6 +53,7 @@ router.get('/', (req, res) => {
 });
 
 // Mount route modules
+router.use('/auth', authRouter);
 router.use('/tasks', tasksRouter);
 
 module.exports = router;

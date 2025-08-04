@@ -121,8 +121,8 @@ const validateJWT = (req, res, next) => {
       });
     }
 
-    // JWT validation logic would go here
-    // For now, just pass through
+    // JWT validation is now handled by authMiddleware.js
+    // This is kept for backward compatibility
     next();
   } catch (error) {
     logger.error('JWT validation error:', error);
