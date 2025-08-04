@@ -238,6 +238,7 @@
                     <div class="relative" @click.stop>
                       <button
                         @click="toggleDropdown(task.id)"
+                        :data-task-id="task.id"
                         class="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full p-1"
                       >
                         <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -249,7 +250,8 @@
                         v-if="openDropdown === task.id"
                         :ref="el => setDropdownRef(el, task.id)"
                         :class="getDropdownClasses(task.id)"
-                        class="absolute w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-60 overflow-y-auto"
+                        class="fixed w-48 bg-white rounded-md shadow-xl border border-gray-200 max-h-60 overflow-y-auto"
+                        style="z-index: 9999;"
                       >
                         <div class="py-1">
                           <router-link
@@ -652,44 +654,56 @@ const calculateDropdownPosition = (taskId: string) => {
   const dropdown = dropdownRefs.value[taskId]
   if (!dropdown) return
 
-  const rect = dropdown.getBoundingClientRect()
+  // Find the trigger button to position relative to it
+  const triggerButton = document.querySelector(`[data-task-id="${taskId}"]`) as HTMLElement
+  if (!triggerButton) return
+
+  const triggerRect = triggerButton.getBoundingClientRect()
   const viewportHeight = window.innerHeight
   const viewportWidth = window.innerWidth
   
-  // Add buffer to prevent dropdown from being too close to viewport edges
-  const buffer = 20
+  // Dropdown dimensions
+  const dropdownWidth = 192 // w-48 = 12rem = 192px
+  const dropdownHeight = 240 // max-h-60 = 15rem = 240px
   
-  // Check if dropdown goes below viewport (considering dropdown height)
-  const dropdownHeight = 240 // Approximate height based on content
-  const wouldOverflowBottom = rect.top + dropdownHeight > viewportHeight - buffer
+  // Calculate position
+  let top = triggerRect.bottom + 8 // mt-2 = 8px
+  let left = triggerRect.right - dropdownWidth // align right edge
   
-  // Check if dropdown goes beyond right edge
-  const wouldOverflowRight = rect.right > viewportWidth - buffer
+  // Check if dropdown would overflow bottom
+  if (top + dropdownHeight > viewportHeight - 20) {
+    top = triggerRect.top - dropdownHeight - 8 // mb-2 = 8px (show above)
+  }
+  
+  // Check if dropdown would overflow left
+  if (left < 20) {
+    left = triggerRect.left // align left edge instead
+  }
+  
+  // Check if dropdown would overflow right
+  if (left + dropdownWidth > viewportWidth - 20) {
+    left = viewportWidth - dropdownWidth - 20
+  }
+  
+  // Ensure minimum distance from top
+  if (top < 20) {
+    top = 20
+  }
 
+  // Apply the calculated position
+  dropdown.style.top = `${top}px`
+  dropdown.style.left = `${left}px`
+  
   dropdownPositions.value[taskId] = {
-    top: wouldOverflowBottom,
-    right: wouldOverflowRight
+    top: triggerRect.bottom + dropdownHeight > viewportHeight - 20,
+    right: triggerRect.right - dropdownWidth < 20
   }
 }
 
-const getDropdownClasses = (taskId: string) => {
-  const position = dropdownPositions.value[taskId] || {}
-  
-  const classes = []
-  
-  if (position.top) {
-    classes.push('bottom-full', 'mb-2')
-  } else {
-    classes.push('top-full', 'mt-2')
-  }
-  
-  if (position.right) {
-    classes.push('left-0')
-  } else {
-    classes.push('right-0')
-  }
-  
-  return classes.join(' ')
+const getDropdownClasses = (_taskId: string) => {
+  // With fixed positioning, we don't need positioning classes
+  // The position is set directly via style in calculateDropdownPosition
+  return ''
 }
 
 const updateStatus = async (taskId: string, status: string) => {
