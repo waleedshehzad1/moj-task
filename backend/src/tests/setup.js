@@ -3,6 +3,10 @@
 // Set test environment first
 process.env.NODE_ENV = 'test';
 
+// Set test JWT secrets if not defined
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test_jwt_refresh_secret';
+
 const { sequelize } = require('../models');
 
 // Global test setup

@@ -1,23 +1,32 @@
 const request = require('supertest');
 const app = require('../../app');
-const { Task, User } = require('../../models');
+const { Task } = require('../../models');
+const { setupAuthUser } = require('../utils/authTestUtils');
 
 describe('Task Controller', () => {
   let testUser;
   let testTask;
+  let authToken;
+  let authHeader;
+  
+  // Helper function for authenticated requests
+  const authRequest = (method, url) => {
+    const req = request(app)[method](url);
+    req.set('Authorization', authHeader);
+    return req;
+  };
 
   beforeAll(async () => {
-    // Create test user (database setup is handled by global setup)
-    testUser = await User.create({
+    // Create test user and get auth token
+    const auth = await setupAuthUser({
       email: 'test@example.com',
       username: 'testuser',
-      password_hash: 'hashedpassword',
-      first_name: 'Test',
-      last_name: 'User',
-      role: 'caseworker',
-      is_active: true,
-      email_verified: true
+      role: 'admin' // Use admin role to have all permissions including delete
     });
+    
+    testUser = auth.user;
+    authToken = auth.token;
+    authHeader = auth.authHeader;
   });
 
   // Remove afterAll as it's handled by global teardown
@@ -37,8 +46,7 @@ describe('Task Controller', () => {
     };
 
     it('should create a new task with valid data', async () => {
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(validTaskData)
         .expect(201);
 
@@ -55,8 +63,7 @@ describe('Task Controller', () => {
         description: 'Missing title and other required fields'
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(invalidData)
         .expect(400);
 
@@ -71,8 +78,7 @@ describe('Task Controller', () => {
         status: 'invalid_status'
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(invalidData)
         .expect(400);
 
@@ -85,8 +91,7 @@ describe('Task Controller', () => {
         due_date: new Date(Date.now() - 86400000).toISOString() // Yesterday
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(invalidData)
         .expect(400);
 
@@ -99,8 +104,7 @@ describe('Task Controller', () => {
         title: 'a'.repeat(256) // 256 characters, exceeds limit
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(invalidData)
         .expect(400);
 
@@ -113,8 +117,7 @@ describe('Task Controller', () => {
         assigned_to: testUser.id
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(taskWithAssignee)
         .expect(201);
 
@@ -129,8 +132,7 @@ describe('Task Controller', () => {
         assigned_to: '00000000-0000-0000-0000-000000000000' // Non-existent user
       };
 
-      const response = await request(app)
-        .post('/api/v1/tasks')
+      const response = await authRequest('post', '/api/v1/tasks')
         .send(taskWithInvalidAssignee)
         .expect(400);
 
@@ -169,8 +171,7 @@ describe('Task Controller', () => {
     });
 
     it('should retrieve all tasks with default pagination', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks')
+      const response = await authRequest('get', '/api/v1/tasks')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -183,8 +184,7 @@ describe('Task Controller', () => {
     });
 
     it('should filter tasks by status', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?status=pending')
+      const response = await authRequest('get', '/api/v1/tasks?status=pending')
         .expect(200);
 
       expect(response.body.data).toHaveLength(1);
@@ -192,8 +192,7 @@ describe('Task Controller', () => {
     });
 
     it('should filter tasks by priority', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?priority=high')
+      const response = await authRequest('get', '/api/v1/tasks?priority=high')
         .expect(200);
 
       expect(response.body.data).toHaveLength(1);
@@ -201,8 +200,7 @@ describe('Task Controller', () => {
     });
 
     it('should filter tasks by assigned user', async () => {
-      const response = await request(app)
-        .get(`/api/v1/tasks?assigned_to=${testUser.id}`)
+      const response = await authRequest('get', `/api/v1/tasks?assigned_to=${testUser.id}`)
         .expect(200);
 
       expect(response.body.data).toHaveLength(1);
@@ -210,8 +208,7 @@ describe('Task Controller', () => {
     });
 
     it('should search tasks by title', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?search=Task 1')
+      const response = await authRequest('get', '/api/v1/tasks?search=Task 1')
         .expect(200);
 
       expect(response.body.data).toHaveLength(1);
@@ -219,8 +216,7 @@ describe('Task Controller', () => {
     });
 
     it('should sort tasks by due_date', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?sort_by=due_date&sort_order=asc')
+      const response = await authRequest('get', '/api/v1/tasks?sort_by=due_date&sort_order=asc')
         .expect(200);
 
       const tasks = response.body.data;
@@ -230,8 +226,7 @@ describe('Task Controller', () => {
     });
 
     it('should implement pagination correctly', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?page=2&limit=2')
+      const response = await authRequest('get', '/api/v1/tasks?page=2&limit=2')
         .expect(200);
 
       expect(response.body.data).toHaveLength(1); // Only 1 task on page 2 with limit 2
@@ -244,8 +239,7 @@ describe('Task Controller', () => {
     });
 
     it('should reject invalid query parameters', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks?status=invalid_status')
+      const response = await authRequest('get', '/api/v1/tasks?status=invalid_status')
         .expect(400);
 
       expect(response.body).toHaveProperty('error', 'ValidationError');
@@ -265,8 +259,7 @@ describe('Task Controller', () => {
     });
 
     it('should retrieve a task by valid ID', async () => {
-      const response = await request(app)
-        .get(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('get', `/api/v1/tasks/${testTask.id}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -278,8 +271,7 @@ describe('Task Controller', () => {
 
     it('should return 404 for non-existent task', async () => {
       const nonExistentId = '00000000-0000-0000-0000-000000000000';
-      const response = await request(app)
-        .get(`/api/v1/tasks/${nonExistentId}`)
+      const response = await authRequest('get', `/api/v1/tasks/${nonExistentId}`)
         .expect(404);
 
       expect(response.body).toHaveProperty('error', 'NotFoundError');
@@ -287,8 +279,7 @@ describe('Task Controller', () => {
     });
 
     it('should reject invalid UUID format', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks/invalid-uuid')
+      const response = await authRequest('get', '/api/v1/tasks/invalid-uuid')
         .expect(400);
 
       expect(response.body).toHaveProperty('error', 'ValidationError');
@@ -314,8 +305,7 @@ describe('Task Controller', () => {
         priority: 'high'
       };
 
-      const response = await request(app)
-        .put(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('put', `/api/v1/tasks/${testTask.id}`)
         .send(updateData)
         .expect(200);
 
@@ -326,8 +316,7 @@ describe('Task Controller', () => {
     });
 
     it('should reject update with no fields provided', async () => {
-      const response = await request(app)
-        .put(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('put', `/api/v1/tasks/${testTask.id}`)
         .send({})
         .expect(400);
 
@@ -336,8 +325,7 @@ describe('Task Controller', () => {
 
     it('should return 404 for non-existent task', async () => {
       const nonExistentId = '00000000-0000-0000-0000-000000000000';
-      const response = await request(app)
-        .put(`/api/v1/tasks/${nonExistentId}`)
+      const response = await authRequest('put', `/api/v1/tasks/${nonExistentId}`)
         .send({ title: 'Updated Title' })
         .expect(404);
 
@@ -347,8 +335,7 @@ describe('Task Controller', () => {
     it('should reject update of completed task', async () => {
       await testTask.update({ status: 'completed' });
 
-      const response = await request(app)
-        .put(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('put', `/api/v1/tasks/${testTask.id}`)
         .send({ title: 'Cannot Update' })
         .expect(400);
 
@@ -369,8 +356,7 @@ describe('Task Controller', () => {
     });
 
     it('should update task status', async () => {
-      const response = await request(app)
-        .patch(`/api/v1/tasks/${testTask.id}/status`)
+      const response = await authRequest('patch', `/api/v1/tasks/${testTask.id}/status`)
         .send({ status: 'in_progress' })
         .expect(200);
 
@@ -379,8 +365,7 @@ describe('Task Controller', () => {
     });
 
     it('should update status to completed and set completed_at', async () => {
-      const response = await request(app)
-        .patch(`/api/v1/tasks/${testTask.id}/status`)
+      const response = await authRequest('patch', `/api/v1/tasks/${testTask.id}/status`)
         .send({ 
           status: 'completed',
           actual_hours: 8.5
@@ -393,8 +378,7 @@ describe('Task Controller', () => {
     });
 
     it('should reject invalid status', async () => {
-      const response = await request(app)
-        .patch(`/api/v1/tasks/${testTask.id}/status`)
+      const response = await authRequest('patch', `/api/v1/tasks/${testTask.id}/status`)
         .send({ status: 'invalid_status' })
         .expect(400);
 
@@ -404,8 +388,7 @@ describe('Task Controller', () => {
     it('should reject status update for archived task', async () => {
       await testTask.update({ is_archived: true });
 
-      const response = await request(app)
-        .patch(`/api/v1/tasks/${testTask.id}/status`)
+      const response = await authRequest('patch', `/api/v1/tasks/${testTask.id}/status`)
         .send({ status: 'completed' })
         .expect(400);
 
@@ -425,8 +408,7 @@ describe('Task Controller', () => {
     });
 
     it('should delete a pending task', async () => {
-      const response = await request(app)
-        .delete(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('delete', `/api/v1/tasks/${testTask.id}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -440,8 +422,7 @@ describe('Task Controller', () => {
     it('should delete a cancelled task', async () => {
       await testTask.update({ status: 'cancelled' });
 
-      const response = await request(app)
-        .delete(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('delete', `/api/v1/tasks/${testTask.id}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -450,8 +431,7 @@ describe('Task Controller', () => {
     it('should reject deletion of in_progress task', async () => {
       await testTask.update({ status: 'in_progress' });
 
-      const response = await request(app)
-        .delete(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('delete', `/api/v1/tasks/${testTask.id}`)
         .expect(400);
 
       expect(response.body).toHaveProperty('error', 'ValidationError');
@@ -461,8 +441,7 @@ describe('Task Controller', () => {
     it('should reject deletion of completed task', async () => {
       await testTask.update({ status: 'completed' });
 
-      const response = await request(app)
-        .delete(`/api/v1/tasks/${testTask.id}`)
+      const response = await authRequest('delete', `/api/v1/tasks/${testTask.id}`)
         .expect(400);
 
       expect(response.body).toHaveProperty('error', 'ValidationError');
@@ -470,8 +449,7 @@ describe('Task Controller', () => {
 
     it('should return 404 for non-existent task', async () => {
       const nonExistentId = '00000000-0000-0000-0000-000000000000';
-      const response = await request(app)
-        .delete(`/api/v1/tasks/${nonExistentId}`)
+      const response = await authRequest('delete', `/api/v1/tasks/${nonExistentId}`)
         .expect(404);
 
       expect(response.body).toHaveProperty('error', 'NotFoundError');
@@ -516,8 +494,7 @@ describe('Task Controller', () => {
     });
 
     it('should return task statistics', async () => {
-      const response = await request(app)
-        .get('/api/v1/tasks/stats')
+      const response = await authRequest('get', '/api/v1/tasks/stats')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
