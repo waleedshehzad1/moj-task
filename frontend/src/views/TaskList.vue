@@ -3,8 +3,12 @@
     <!-- Page Header -->
     <div class="sm:flex sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Tasks</h1>
-        <p class="mt-2 text-sm text-gray-700">Manage and track all your tasks</p>
+        <h1 class="text-2xl font-bold text-gray-900">
+          {{ pageTitle }}
+        </h1>
+        <p class="mt-2 text-sm text-gray-700">
+          {{ pageDescription }}
+        </p>
       </div>
       <div class="mt-4 sm:mt-0">
         <router-link
@@ -93,6 +97,19 @@
             <option value="title:asc">Title (A-Z)</option>
           </select>
         </div>
+      </div>
+
+      <!-- Clear Filters Button -->
+      <div v-if="hasActiveFilters" class="mt-4 flex justify-end">
+        <button
+          @click="clearFilters"
+          class="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <svg class="-ml-1 mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Clear Filters
+        </button>
       </div>
 
       <!-- Bulk Actions -->
@@ -401,7 +418,18 @@ const dropdownRefs = ref<Record<string, HTMLElement>>({})
 
 // Computed properties
 const tasks = computed(() => {
-  return taskStore.tasks || []
+  let allTasks = taskStore.tasks || []
+  
+  // Apply overdue filter if specified in URL
+  const route = router.currentRoute.value
+  if (route.query.overdue === 'true' && !statusFilter.value) {
+    // For overdue view, exclude completed and cancelled tasks
+    allTasks = allTasks.filter(task => 
+      task.status !== 'completed' && task.status !== 'cancelled'
+    )
+  }
+  
+  return allTasks
 })
 const loading = computed(() => {
   return taskStore.loading
@@ -447,12 +475,60 @@ const visiblePages = computed(() => {
   return rangeWithDots
 })
 
+const pageTitle = computed(() => {
+  const route = router.currentRoute.value
+  
+  if (route.query.overdue === 'true') {
+    return 'Overdue Tasks'
+  } else if (statusFilter.value) {
+    const statusMap: Record<string, string> = {
+      pending: 'Pending Tasks',
+      in_progress: 'In Progress Tasks',
+      completed: 'Completed Tasks',
+      cancelled: 'Cancelled Tasks'
+    }
+    return statusMap[statusFilter.value] || 'Tasks'
+  }
+  
+  return 'Tasks'
+})
+
+const pageDescription = computed(() => {
+  const route = router.currentRoute.value
+  
+  if (route.query.overdue === 'true') {
+    return 'Tasks that are past their due date and need immediate attention'
+  } else if (statusFilter.value) {
+    const statusMap: Record<string, string> = {
+      pending: 'Tasks waiting to be started',
+      in_progress: 'Tasks currently being worked on',
+      completed: 'Tasks that have been finished',
+      cancelled: 'Tasks that have been cancelled'
+    }
+    return statusMap[statusFilter.value] || 'Manage and track all your tasks'
+  }
+  
+  return 'Manage and track all your tasks'
+})
+
+const hasActiveFilters = computed(() => {
+  const route = router.currentRoute.value
+  return !!(
+    searchQuery.value ||
+    statusFilter.value ||
+    priorityFilter.value ||
+    route.query.overdue === 'true' ||
+    sortBy.value !== 'created_at:desc'
+  )
+})
+
 // Methods
 const loadTasks = async (page?: number) => {
   try {
     const [sortField, sortOrder] = sortBy.value.split(':')
+    const route = router.currentRoute.value
     
-    const query = {
+    const query: any = {
       search: searchQuery.value || undefined,
       status: statusFilter.value || undefined,
       priority: priorityFilter.value || undefined,
@@ -460,6 +536,17 @@ const loadTasks = async (page?: number) => {
       sort_order: sortOrder as 'asc' | 'desc',
       page: page || pagination.value.page,
       limit: pagination.value.limit
+    }
+    
+    // Handle overdue tasks filter
+    if (route.query.overdue === 'true') {
+      // For overdue tasks, filter by due_before today
+      const today = new Date().toISOString()
+      query.due_before = today
+      // Only show pending and in_progress tasks for overdue filter
+      if (!query.status) {
+        // We'll use a computed property to filter on frontend since backend doesn't support multiple status exclusion
+      }
     }
     
     await taskStore.fetchTasks(query)
@@ -470,15 +557,65 @@ const loadTasks = async (page?: number) => {
 }
 
 const debouncedSearch = debounce(async () => {
+  updateURLWithFilters()
   await loadTasks(1) // Reset to page 1 when searching
 }, 300)
 
 const applyFilters = async () => {
+  updateURLWithFilters()
   await loadTasks(1) // Reset to page 1 when applying filters
+}
+
+// Update URL with current filter values
+const updateURLWithFilters = () => {
+  const route = router.currentRoute.value
+  const query: any = { ...route.query }
+  
+  // Update query parameters based on current filters
+  if (statusFilter.value) {
+    query.status = statusFilter.value
+  } else {
+    delete query.status
+  }
+  
+  if (priorityFilter.value) {
+    query.priority = priorityFilter.value
+  } else {
+    delete query.priority
+  }
+  
+  if (searchQuery.value) {
+    query.search = searchQuery.value
+  } else {
+    delete query.search
+  }
+  
+  const [sortField, sortOrder] = sortBy.value.split(':')
+  if (sortField !== 'created_at' || sortOrder !== 'desc') {
+    query.sort_by = sortField
+    query.sort_order = sortOrder
+  } else {
+    delete query.sort_by
+    delete query.sort_order
+  }
+  
+  // Update the URL without triggering a navigation
+  router.replace({ query })
 }
 
 const changePage = async (page: number) => {
   await loadTasks(page)
+}
+
+const clearFilters = () => {
+  // Reset all filters
+  searchQuery.value = ''
+  statusFilter.value = ''
+  priorityFilter.value = ''
+  sortBy.value = 'created_at:desc'
+  
+  // Navigate to clean URL
+  router.push('/tasks')
 }
 
 const toggleSelectAll = () => {
@@ -650,10 +787,43 @@ const handleResize = () => {
 
 // Lifecycle
 onMounted(async () => {
+  // Initialize filters from URL query parameters
+  initializeFiltersFromURL()
   await loadTasks()
   document.addEventListener('click', closeDropdowns)
   window.addEventListener('resize', handleResize)
 })
+
+// Initialize filters from URL query parameters
+const initializeFiltersFromURL = () => {
+  const route = router.currentRoute.value
+  
+  // Set status filter from URL
+  if (route.query.status) {
+    statusFilter.value = route.query.status as string
+  }
+  
+  // Set priority filter from URL
+  if (route.query.priority) {
+    priorityFilter.value = route.query.priority as string
+  }
+  
+  // Set search query from URL
+  if (route.query.search) {
+    searchQuery.value = route.query.search as string
+  }
+  
+  // Set sort from URL
+  if (route.query.sort_by && route.query.sort_order) {
+    sortBy.value = `${route.query.sort_by}:${route.query.sort_order}`
+  }
+  
+  // Handle special "overdue" query parameter
+  if (route.query.overdue === 'true') {
+    // For overdue tasks, we need to filter by due date and exclude completed/cancelled
+    // We'll handle this in the loadTasks function
+  }
+}
 
 // Cleanup
 onUnmounted(() => {
