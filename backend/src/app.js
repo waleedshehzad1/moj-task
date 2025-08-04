@@ -52,36 +52,69 @@ class Application {
       }
     }));
 
-    // Rate limiting to prevent brute force attacks
+    // Rate limiting to prevent brute force attacks - More lenient for development
     const limiter = rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 100 : 1000), // 1000 for dev, 100 for prod
       message: {
         error: 'Too many requests from this IP, please try again later.',
         retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000) / 1000)
       },
       standardHeaders: true,
       legacyHeaders: false,
+      skip: (req) => {
+        // Skip rate limiting in development for certain paths
+        if (process.env.NODE_ENV === 'development') {
+          return req.path.startsWith('/api/') || req.path.startsWith('/health');
+        }
+        return false;
+      }
     });
 
-    // Slow down repeated requests
+    // Slow down repeated requests - Disabled in development
     const speedLimiter = slowDown({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      delayAfter: 50, // allow 50 requests per windowMs without delay
-      delayMs: () => 100, // fixed function format for v2
+      delayAfter: process.env.NODE_ENV === 'development' ? 1000 : 50, // More lenient in dev
+      delayMs: () => process.env.NODE_ENV === 'development' ? 0 : 100, // No delay in dev
       validate: { delayMs: false } // disable warning
     });
 
     this.app.use(limiter);
     this.app.use(speedLimiter);
 
-    // CORS configuration - Allow all origins
-    this.app.use(cors({
-      origin: true, // Allow all origins
+    // CORS configuration - Allow frontend and development origins
+    const corsOptions = {
+      origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, postman)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+          'http://localhost:3001',
+          'http://127.0.0.1:3001',
+          'http://localhost:3000',
+          'http://127.0.0.1:3000'
+        ];
+        
+        // In development, allow all localhost origins
+        if (process.env.NODE_ENV === 'development') {
+          if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+            return callback(null, true);
+          }
+        }
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: process.env.CORS_CREDENTIALS === 'true',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
-    }));
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With'],
+      exposedHeaders: ['X-Total-Count', 'X-Page-Count']
+    };
+
+    this.app.use(cors(corsOptions));
 
     // Compression middleware
     this.app.use(compression());

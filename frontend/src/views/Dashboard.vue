@@ -188,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useTaskStore } from '@/stores/taskStore'
@@ -208,11 +208,7 @@ const recentTasks = computed(() => {
   return Array.isArray(taskStore.tasks) ? taskStore.tasks.slice(0, 5) : []
 })
 
-const navigateToTask = (taskId: string) => {
-  router.push(`/tasks/${taskId}`)
-}
-
-onMounted(async () => {
+const loadDashboardData = async () => {
   try {
     await Promise.all([
       taskStore.fetchTaskStats(),
@@ -221,6 +217,22 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to load dashboard data:', error)
     toast.error('Failed to load dashboard data')
+  }
+}
+
+const navigateToTask = (taskId: string) => {
+  router.push(`/tasks/${taskId}`)
+}
+
+onMounted(async () => {
+  await loadDashboardData()
+})
+
+// Watch for route changes to refresh dashboard when returning from other views
+watch(() => router.currentRoute.value, async (newRoute, oldRoute) => {
+  // Refresh dashboard data when navigating back to dashboard from other routes
+  if (newRoute.path === '/' && oldRoute && oldRoute.path !== '/') {
+    await loadDashboardData()
   }
 })
 </script>

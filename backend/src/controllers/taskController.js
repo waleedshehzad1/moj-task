@@ -1,4 +1,4 @@
-const { Task, User } = require('../models');
+const { Task, User, sequelize } = require('../models');
 const logger = require('../utils/logger');
 const { redisClient } = require('../config/redis');
 const { Op } = require('sequelize');
@@ -59,32 +59,66 @@ class TaskController {
         }
       }
 
-      // Create task
-      const task = await Task.create(req.body);
+      // Use transaction to ensure consistency
+      const transaction = await sequelize.transaction();
+      
+      try {
+        // Create task within transaction
+        const task = await Task.create(req.body, { transaction });
 
-      // Load associations for response
-      const createdTask = await Task.findByPk(task.id, {
-        include: [
-          {
-            model: User,
-            as: 'assignee',
-            attributes: ['id', 'first_name', 'last_name', 'email', 'role']
-          },
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'first_name', 'last_name', 'email', 'role']
-          }
-        ]
-      });
+        // Load associations for response
+        const createdTask = await Task.findByPk(task.id, {
+          include: [
+            {
+              model: User,
+              as: 'assignee',
+              attributes: ['id', 'first_name', 'last_name', 'email', 'role']
+            },
+            {
+              model: User,
+              as: 'creator',
+              attributes: ['id', 'first_name', 'last_name', 'email', 'role']
+            }
+          ],
+          transaction
+        });
 
-      // Log performance
-      const endTime = process.hrtime.bigint();
-      const duration = Number(endTime - startTime) / 1000000;
-      logger.logPerformance('CREATE_TASK', duration, { taskId: task.id });
+        // Commit transaction first
+        await transaction.commit();
 
-      // Invalidate relevant caches
-      await TaskController.invalidateTaskCaches();
+        // THEN invalidate caches after database is consistent
+        await TaskController.invalidateTaskCaches();
+        
+        // Small delay to ensure cache invalidation propagates
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Log performance
+        const endTime = process.hrtime.bigint();
+        const duration = Number(endTime - startTime) / 1000000;
+        logger.logPerformance('CREATE_TASK', duration, { taskId: task.id });
+
+        // Log audit event
+        logger.logAudit('TASK_CREATED', {
+          taskId: task.id,
+          title: task.title,
+          assignedTo: task.assigned_to,
+          createdBy: req.user?.id,
+          priority: task.priority,
+          status: task.status
+        });
+
+        res.status(201).json({
+          success: true,
+          data: createdTask,
+          message: 'Task created successfully',
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (transactionError) {
+        // Rollback transaction on error
+        await transaction.rollback();
+        throw transactionError;
+      }
 
       // Log audit event
       logger.logAudit('TASK_CREATED', {
@@ -205,8 +239,22 @@ class TaskController {
         include_archived = false
       } = req.query;
 
-      // Build cache key
-      const cacheKey = `tasks:list:${JSON.stringify(req.query)}`;
+      // Build cache key with normalized parameters to avoid cache key inconsistencies
+      const normalizedQuery = {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 10,
+        status: status || '',
+        priority: priority || '',
+        assigned_to: assigned_to || '',
+        search: search || '',
+        sort_by: sort_by || 'created_at',
+        sort_order: sort_order || 'desc',
+        due_before: due_before || '',
+        due_after: due_after || '',
+        tags: tags || '',
+        include_archived: include_archived || false
+      };
+      const cacheKey = `tasks:list:${JSON.stringify(normalizedQuery)}`;
       
       // Try to get from cache first
       const cachedResult = await redisClient.cacheGet(cacheKey);
@@ -295,8 +343,8 @@ class TaskController {
         timestamp: new Date().toISOString()
       };
 
-      // Cache result for 5 minutes
-      await redisClient.cacheSet(cacheKey, result, 300);
+      // Cache result for only 1 minute to reduce stale data issues
+      await redisClient.cacheSet(cacheKey, result, 60);
 
       // Log performance
       const endTime = process.hrtime.bigint();
@@ -495,27 +543,73 @@ class TaskController {
       // Store original values for audit logging
       const originalValues = { ...task.dataValues };
 
-      // Update task
-      await task.update(req.body);
+      // Use transaction for consistency
+      const transaction = await sequelize.transaction();
+      
+      try {
+        // Update task within transaction
+        await task.update(req.body, { transaction });
 
-      // Load updated task with associations
-      const updatedTask = await Task.findByPk(id, {
-        include: [
-          {
-            model: User,
-            as: 'assignee',
-            attributes: ['id', 'first_name', 'last_name', 'email', 'role']
-          },
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'first_name', 'last_name', 'email', 'role']
+        // Load updated task with associations
+        const updatedTask = await Task.findByPk(id, {
+          include: [
+            {
+              model: User,
+              as: 'assignee',
+              attributes: ['id', 'first_name', 'last_name', 'email', 'role']
+            },
+            {
+              model: User,
+              as: 'creator',
+              attributes: ['id', 'first_name', 'last_name', 'email', 'role']
+            }
+          ],
+          transaction
+        });
+
+        // Commit transaction first
+        await transaction.commit();
+
+        // THEN invalidate caches after database is consistent
+        await TaskController.invalidateTaskCaches(id);
+        
+        // Small delay to ensure cache invalidation propagates
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Log performance
+        const endTime = process.hrtime.bigint();
+        const duration = Number(endTime - startTime) / 1000000;
+        logger.logPerformance('UPDATE_TASK', duration, { taskId: id });
+
+        // Audit logging with change details
+        const changes = {};
+        Object.keys(req.body).forEach(key => {
+          if (originalValues[key] !== req.body[key]) {
+            changes[key] = {
+              from: originalValues[key],
+              to: req.body[key]
+            };
           }
-        ]
-      });
+        });
 
-      // Invalidate caches
-      await TaskController.invalidateTaskCaches(id);
+        logger.logAudit('TASK_UPDATED', {
+          taskId: id,
+          changes,
+          updatedBy: req.user?.id
+        });
+
+        res.json({
+          success: true,
+          data: updatedTask,
+          message: 'Task updated successfully',
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (transactionError) {
+        // Rollback transaction on error
+        await transaction.rollback();
+        throw transactionError;
+      }
 
       // Log performance
       const endTime = process.hrtime.bigint();
@@ -720,31 +814,47 @@ class TaskController {
       // Store task data for audit logging before deletion
       const taskData = { ...task.dataValues };
 
-      // Soft delete (paranoid: true in model)
-      await task.destroy();
+      // Use transaction for consistency
+      const transaction = await sequelize.transaction();
+      
+      try {
+        // Soft delete (paranoid: true in model) within transaction
+        await task.destroy({ transaction });
 
-      // Invalidate caches
-      await TaskController.invalidateTaskCaches(id);
+        // Commit transaction first
+        await transaction.commit();
 
-      // Log performance
-      const endTime = process.hrtime.bigint();
-      const duration = Number(endTime - startTime) / 1000000;
-      logger.logPerformance('DELETE_TASK', duration, { taskId: id });
+        // THEN invalidate caches after database is consistent
+        await TaskController.invalidateTaskCaches(id);
+        
+        // Small delay to ensure cache invalidation propagates
+        await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Audit logging
-      logger.logAudit('TASK_DELETED', {
-        taskId: id,
-        title: taskData.title,
-        status: taskData.status,
-        assignedTo: taskData.assigned_to,
-        deletedBy: req.user?.id
-      });
+        // Log performance
+        const endTime = process.hrtime.bigint();
+        const duration = Number(endTime - startTime) / 1000000;
+        logger.logPerformance('DELETE_TASK', duration, { taskId: id });
 
-      res.json({
-        success: true,
-        message: 'Task deleted successfully',
-        timestamp: new Date().toISOString()
-      });
+        // Audit logging
+        logger.logAudit('TASK_DELETED', {
+          taskId: id,
+          title: taskData.title,
+          status: taskData.status,
+          assignedTo: taskData.assigned_to,
+          deletedBy: req.user?.id
+        });
+
+        res.json({
+          success: true,
+          message: 'Task deleted successfully',
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (transactionError) {
+        // Rollback transaction on error
+        await transaction.rollback();
+        throw transactionError;
+      }
 
     } catch (error) {
       logger.error('Error deleting task:', error);
@@ -854,20 +964,48 @@ class TaskController {
         logger.debug(`Invalidated individual task cache: ${taskCacheKey}`);
       }
 
-      // Invalidate all task list caches (with pattern matching)
+      // More aggressive cache invalidation for task lists
       try {
         const client = redisClient.client;
         if (client && client.keys) {
-          // Get all cache keys that match task list patterns
-          const listCacheKeys = await client.keys('cache:tasks:list:*');
-          if (listCacheKeys.length > 0) {
-            await client.del(...listCacheKeys);
-            logger.debug(`Invalidated ${listCacheKeys.length} task list cache entries`);
+          // Get all cache keys that match any task-related patterns
+          const allCachePatterns = [
+            'cache:tasks:list:*',     // getAllTasks cache
+            'cache:task:*',           // individual task cache
+            'cache:stats:*',          // stats cache
+            'cache:dashboard:*'       // dashboard cache that might include tasks
+          ];
+          
+          for (const pattern of allCachePatterns) {
+            const cacheKeys = await client.keys(pattern);
+            if (cacheKeys.length > 0) {
+              await client.del(...cacheKeys);
+              logger.debug(`Invalidated ${cacheKeys.length} cache entries for pattern: ${pattern}`);
+            }
+          }
+          
+          // Also flush any cache keys that contain 'task' in the name
+          const taskRelatedKeys = await client.keys('cache:*task*');
+          if (taskRelatedKeys.length > 0) {
+            await client.del(...taskRelatedKeys);
+            logger.debug(`Invalidated ${taskRelatedKeys.length} task-related cache entries`);
           }
         }
       } catch (patternError) {
-        logger.warn('Could not invalidate task list caches with pattern matching:', patternError);
-        // Fallback: just log the warning and continue
+        logger.warn('Could not invalidate task caches with pattern matching:', patternError);
+        // Fallback: try to flush all cache to ensure consistency
+        try {
+          const client = redisClient.client;
+          if (client && client.keys) {
+            const allCacheKeys = await client.keys('cache:*');
+            if (allCacheKeys.length > 0) {
+              await client.del(...allCacheKeys);
+              logger.info(`Fallback: Flushed all ${allCacheKeys.length} cache entries to ensure consistency`);
+            }
+          }
+        } catch (fallbackError) {
+          logger.error('Fallback cache flush failed:', fallbackError);
+        }
       }
 
       logger.debug('Task caches invalidated successfully', { taskId });

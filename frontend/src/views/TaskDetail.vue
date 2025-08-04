@@ -299,9 +299,16 @@ const isOverdue = computed(() => {
 const loadTask = async () => {
   const taskId = route.params.id as string
   try {
+    // Clear current task cache to ensure fresh data
+    taskStore.clearCurrentTask()
     await taskStore.fetchTask(taskId)
-  } catch (error) {
-    toast.error('Failed to load task')
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      toast.error('Task not found - it may have been deleted')
+      router.push('/tasks')
+    } else {
+      toast.error('Failed to load task')
+    }
   }
 }
 
@@ -311,8 +318,17 @@ const updateStatus = async (status: string) => {
   try {
     await taskStore.updateTaskStatus(task.value.id, status)
     toast.success(`Task status updated to ${status}`)
-  } catch (error) {
-    toast.error('Failed to update task status')
+    // Refresh the task to ensure UI shows latest data from backend
+    await loadTask()
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      toast.error('Task not found - it may have been deleted')
+      router.push('/tasks')
+    } else {
+      toast.error('Failed to update task status')
+      // Refresh even on error to ensure UI consistency
+      await loadTask()
+    }
   }
 }
 
@@ -327,8 +343,13 @@ const confirmDelete = async () => {
     await taskStore.deleteTask(task.value.id)
     toast.success('Task deleted successfully')
     router.push('/tasks')
-  } catch (error) {
-    toast.error('Failed to delete task')
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      toast.warning('Task was already deleted')
+      router.push('/tasks')
+    } else {
+      toast.error('Failed to delete task')
+    }
   }
   showDeleteModal.value = false
 }

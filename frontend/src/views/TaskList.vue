@@ -560,11 +560,15 @@ const loadTasks = async (page?: number) => {
 
 const debouncedSearch = debounce(async () => {
   updateURLWithFilters()
+  // Clear selected tasks when search changes to prevent confusion
+  selectedTasks.value = []
   await loadTasks(1) // Reset to page 1 when searching
 }, 300)
 
 const applyFilters = async () => {
   updateURLWithFilters()
+  // Clear selected tasks when filters change to prevent confusion
+  selectedTasks.value = []
   await loadTasks(1) // Reset to page 1 when applying filters
 }
 
@@ -615,6 +619,9 @@ const clearFilters = () => {
   statusFilter.value = ''
   priorityFilter.value = ''
   sortBy.value = 'created_at:desc'
+  
+  // Clear selected tasks when clearing filters
+  selectedTasks.value = []
   
   // Navigate to clean URL
   router.push('/tasks')
@@ -711,6 +718,8 @@ const updateStatus = async (taskId: string, status: string) => {
     await taskStore.updateTaskStatus(taskId, status)
     toast.success(`Task status updated to ${status}`)
     openDropdown.value = null
+    // Refresh the task list to ensure UI is in sync with backend
+    await loadTasks()
   } catch (error) {
     toast.error('Failed to update task status')
   }
@@ -726,15 +735,37 @@ const deleteTask = (taskId: string) => {
 const confirmDelete = async () => {
   try {
     if (isBulkDelete.value) {
-      // Handle bulk deletion
-      const promises = selectedTasks.value.map(taskId => 
+      // Handle bulk deletion - filter out invalid task IDs
+      const validTaskIds = selectedTasks.value.filter(taskId => 
+        tasks.value.some(task => task.id === taskId)
+      )
+      
+      if (validTaskIds.length !== selectedTasks.value.length) {
+        toast.warning('Some selected tasks were already deleted')
+      }
+      
+      if (validTaskIds.length === 0) {
+        toast.error('No valid tasks selected for deletion')
+        cancelDelete()
+        return
+      }
+      
+      const promises = validTaskIds.map(taskId => 
         taskStore.deleteTask(taskId)
       )
       await Promise.all(promises)
-      toast.success(`${selectedTasks.value.length} task${selectedTasks.value.length !== 1 ? 's' : ''} deleted successfully`)
+      toast.success(`${validTaskIds.length} task${validTaskIds.length !== 1 ? 's' : ''} deleted successfully`)
       selectedTasks.value = []
     } else if (taskToDelete.value) {
-      // Handle single task deletion
+      // Handle single task deletion - check if task still exists
+      const taskExists = tasks.value.some(task => task.id === taskToDelete.value)
+      if (!taskExists) {
+        toast.warning('Task was already deleted')
+        cancelDelete()
+        await loadTasks()
+        return
+      }
+      
       await taskStore.deleteTask(taskToDelete.value)
       toast.success('Task deleted successfully')
       selectedTasks.value = selectedTasks.value.filter(id => id !== taskToDelete.value)
@@ -760,14 +791,33 @@ const cancelDelete = () => {
 
 const bulkUpdateStatus = async (status: string) => {
   try {
-    const promises = selectedTasks.value.map(taskId => 
+    // Filter out invalid task IDs that might have been deleted
+    const validTaskIds = selectedTasks.value.filter(taskId => 
+      tasks.value.some(task => task.id === taskId)
+    )
+    
+    if (validTaskIds.length !== selectedTasks.value.length) {
+      toast.warning('Some selected tasks were already deleted')
+    }
+    
+    if (validTaskIds.length === 0) {
+      toast.error('No valid tasks selected for status update')
+      selectedTasks.value = []
+      return
+    }
+    
+    const promises = validTaskIds.map(taskId => 
       taskStore.updateTaskStatus(taskId, status)
     )
     await Promise.all(promises)
-    toast.success(`${selectedTasks.value.length} tasks updated`)
+    toast.success(`${validTaskIds.length} tasks updated`)
     selectedTasks.value = []
+    // Refresh the task list to ensure UI is in sync with backend
+    await loadTasks()
   } catch (error) {
     toast.error('Failed to update tasks')
+    // Refresh even on error to ensure UI consistency
+    await loadTasks()
   }
 }
 
@@ -845,7 +895,16 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
 
-watch(() => router.currentRoute.value, () => {
+watch(() => router.currentRoute.value, async (newRoute, oldRoute) => {
+  // Refresh data when navigating to TaskList from other routes
+  // This ensures we have the latest data when returning from create/edit/detail views
+  if (newRoute.path === '/tasks' && oldRoute && oldRoute.path !== '/tasks') {
+    // Initialize filters from URL and reload tasks
+    initializeFiltersFromURL()
+    await loadTasks()
+  }
+  
+  // Clean up event listeners
   document.removeEventListener('click', closeDropdowns)
   window.removeEventListener('resize', handleResize)
 })

@@ -35,6 +35,17 @@ export const useTaskStore = defineStore('task', () => {
     loading.value = true
     error.value = null
     try {
+      // Always clear cache before fetching to ensure we're not mixing cached and fresh data
+      tasks.value = []
+      pagination.value = {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      }
+      
       const response = await taskService.getTasks(query)
       tasks.value = Array.isArray(response.data) ? response.data : []
       pagination.value = response.pagination || {
@@ -72,11 +83,21 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       const newTask = await taskService.createTask(taskData)
-      // Ensure tasks.value is an array before calling unshift
-      if (!Array.isArray(tasks.value)) {
-        tasks.value = []
+      
+      // Clear the cached tasks to force fresh data retrieval
+      // This ensures consistency between different API queries
+      tasks.value = []
+      
+      // Add a small delay to allow backend consistency to propagate
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Refresh stats since creating a task affects statistics
+      try {
+        await fetchTaskStats()
+      } catch (statsError) {
+        console.warn('Failed to refresh task statistics after creation:', statsError)
       }
-      tasks.value.unshift(newTask)
+      
       return newTask
     } catch (err: any) {
       error.value = err.message || 'Failed to create task'
@@ -91,13 +112,26 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       const updatedTask = await taskService.updateTask(id, taskData)
-      const index = tasks.value.findIndex(task => task.id === id)
-      if (index !== -1) {
-        tasks.value[index] = updatedTask
-      }
+      
+      // Clear the cached tasks to force fresh data retrieval
+      // This ensures consistency between different API queries
+      tasks.value = []
+      
+      // Add a small delay to allow backend consistency to propagate
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Update current task if it's the one being updated
       if (currentTask.value?.id === id) {
         currentTask.value = updatedTask
       }
+      
+      // Refresh stats since updating a task might affect statistics
+      try {
+        await fetchTaskStats()
+      } catch (statsError) {
+        console.warn('Failed to refresh task statistics after update:', statsError)
+      }
+      
       return updatedTask
     } catch (err: any) {
       error.value = err.message || 'Failed to update task'
@@ -110,15 +144,27 @@ export const useTaskStore = defineStore('task', () => {
   const updateTaskStatus = async (id: string, status: string) => {
     try {
       const response = await taskService.updateTaskStatus(id, status)
-      const index = tasks.value.findIndex(task => task.id === id)
-      if (index !== -1) {
-        // Merge the response with existing task data to preserve all fields
-        tasks.value[index] = { ...tasks.value[index], ...response }
-      }
+      
+      // Clear the cached tasks to force fresh data retrieval
+      // This ensures consistency between different API queries
+      tasks.value = []
+      
+      // Add a small delay to allow backend consistency to propagate
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Update current task if it's the one being updated
       if (currentTask.value?.id === id) {
         currentTask.value = { ...currentTask.value, ...response }
       }
-      return tasks.value[index] || currentTask.value
+      
+      // Refresh stats since status changes affect statistics
+      try {
+        await fetchTaskStats()
+      } catch (statsError) {
+        console.warn('Failed to refresh task statistics after status update:', statsError)
+      }
+      
+      return response
     } catch (err: any) {
       error.value = err.message || 'Failed to update task status'
       throw err
@@ -139,16 +185,25 @@ export const useTaskStore = defineStore('task', () => {
       // Log 404 errors for debugging but don't throw
       console.warn(`Task ${id} was already deleted (404 response)`)
     } finally {
-      // Always remove from local state regardless of API response
-      // since 404 means it's already deleted
-      if (!Array.isArray(tasks.value)) {
-        tasks.value = []
-      } else {
-        tasks.value = tasks.value.filter(task => task.id !== id)
-      }
+      // Clear the cached tasks to force fresh data retrieval
+      // This ensures consistency between different API queries
+      tasks.value = []
+      
+      // Add a small delay to allow backend consistency to propagate
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Clear current task if it's the one being deleted
       if (currentTask.value?.id === id) {
         currentTask.value = null
       }
+      
+      // Refresh stats since deleting a task affects statistics
+      try {
+        await fetchTaskStats()
+      } catch (statsError) {
+        console.warn('Failed to refresh task statistics after deletion:', statsError)
+      }
+      
       loading.value = false
     }
   }
@@ -169,6 +224,58 @@ export const useTaskStore = defineStore('task', () => {
 
   const clearCurrentTask = () => {
     currentTask.value = null
+  }
+
+  // Clear all cached data to force fresh retrieval
+  const clearCache = () => {
+    tasks.value = []
+    currentTask.value = null
+    pagination.value = {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    }
+  }
+
+  // Force refresh all data from backend - useful for ensuring data consistency
+  const refreshAllData = async (query: TaskQuery = {}) => {
+    try {
+      // Clear cache first to ensure fresh data
+      clearCache()
+      
+      // Add a small delay to ensure any pending backend operations are complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      await Promise.all([
+        fetchTasks(query),
+        fetchTaskStats()
+      ])
+    } catch (err) {
+      console.error('Failed to refresh data:', err)
+      throw err
+    }
+  }
+
+  // Force refresh with longer delay for backend consistency
+  const forceRefreshAfterWrite = async (query: TaskQuery = {}) => {
+    try {
+      // Clear cache first
+      clearCache()
+      
+      // Longer delay to ensure backend consistency after write operations
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      await Promise.all([
+        fetchTasks(query),
+        fetchTaskStats()
+      ])
+    } catch (err) {
+      console.error('Failed to force refresh after write:', err)
+      throw err
+    }
   }
 
   return {
@@ -194,5 +301,8 @@ export const useTaskStore = defineStore('task', () => {
     fetchTaskStats,
     clearError,
     clearCurrentTask,
+    clearCache,
+    refreshAllData,
+    forceRefreshAfterWrite,
   }
 })
