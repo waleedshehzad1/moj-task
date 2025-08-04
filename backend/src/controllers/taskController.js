@@ -120,23 +120,6 @@ class TaskController {
         throw transactionError;
       }
 
-      // Log audit event
-      logger.logAudit('TASK_CREATED', {
-        taskId: task.id,
-        title: task.title,
-        assignedTo: task.assigned_to,
-        createdBy: req.user?.id,
-        priority: task.priority,
-        status: task.status
-      });
-
-      res.status(201).json({
-        success: true,
-        data: createdTask,
-        message: 'Task created successfully',
-        timestamp: new Date().toISOString()
-      });
-
     } catch (error) {
       logger.error('Error creating task:', error);
       next(error);
@@ -610,35 +593,6 @@ class TaskController {
         await transaction.rollback();
         throw transactionError;
       }
-
-      // Log performance
-      const endTime = process.hrtime.bigint();
-      const duration = Number(endTime - startTime) / 1000000;
-      logger.logPerformance('UPDATE_TASK', duration, { taskId: id });
-
-      // Audit logging with change details
-      const changes = {};
-      Object.keys(req.body).forEach(key => {
-        if (originalValues[key] !== req.body[key]) {
-          changes[key] = {
-            from: originalValues[key],
-            to: req.body[key]
-          };
-        }
-      });
-
-      logger.logAudit('TASK_UPDATED', {
-        taskId: id,
-        changes,
-        updatedBy: req.user?.id
-      });
-
-      res.json({
-        success: true,
-        data: updatedTask,
-        message: 'Task updated successfully',
-        timestamp: new Date().toISOString()
-      });
 
     } catch (error) {
       logger.error('Error updating task:', error);
