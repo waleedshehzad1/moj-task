@@ -130,7 +130,17 @@ export const useTaskStore = defineStore('task', () => {
     error.value = null
     try {
       await taskService.deleteTask(id)
-      // Ensure tasks.value is an array before calling filter
+    } catch (err: any) {
+      // If task is not found (404), it's already deleted, so we treat it as success
+      if (err.response?.status !== 404) {
+        error.value = err.message || 'Failed to delete task'
+        throw err
+      }
+      // Log 404 errors for debugging but don't throw
+      console.warn(`Task ${id} was already deleted (404 response)`)
+    } finally {
+      // Always remove from local state regardless of API response
+      // since 404 means it's already deleted
       if (!Array.isArray(tasks.value)) {
         tasks.value = []
       } else {
@@ -139,10 +149,6 @@ export const useTaskStore = defineStore('task', () => {
       if (currentTask.value?.id === id) {
         currentTask.value = null
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to delete task'
-      throw err
-    } finally {
       loading.value = false
     }
   }

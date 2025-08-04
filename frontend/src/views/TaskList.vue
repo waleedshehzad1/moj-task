@@ -588,8 +588,14 @@ const confirmDelete = async () => {
       toast.success('Task deleted successfully')
       selectedTasks.value = selectedTasks.value.filter(id => id !== taskToDelete.value)
     }
+    
+    // Refresh the task list to ensure UI is in sync
+    await loadTasks()
   } catch (error) {
+    console.error('Delete operation failed:', error)
     toast.error('Failed to delete task(s)')
+    // Even if there's an error, refresh the list to ensure UI consistency
+    await loadTasks()
   }
   cancelDelete()
 }
