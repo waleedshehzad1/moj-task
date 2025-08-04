@@ -230,7 +230,9 @@
                       
                       <div
                         v-if="openDropdown === task.id"
-                        class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200"
+                        :ref="el => setDropdownRef(el, task.id)"
+                        :class="getDropdownClasses(task.id)"
+                        class="absolute w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-60 overflow-y-auto"
                       >
                         <div class="py-1">
                           <router-link
@@ -369,7 +371,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useTaskStore } from '@/stores/taskStore'
@@ -393,6 +395,8 @@ const openDropdown = ref<string | null>(null)
 const showDeleteModal = ref(false)
 const taskToDelete = ref<string | null>(null)
 const deleteModalMessage = ref('')
+const dropdownPositions = ref<Record<string, { top?: boolean; right?: boolean }>>({})
+const dropdownRefs = ref<Record<string, HTMLElement>>({})
 
 // Computed properties
 const tasks = computed(() => {
@@ -485,7 +489,69 @@ const toggleSelectAll = () => {
 }
 
 const toggleDropdown = (taskId: string) => {
-  openDropdown.value = openDropdown.value === taskId ? null : taskId
+  const wasOpen = openDropdown.value === taskId
+  openDropdown.value = wasOpen ? null : taskId
+  
+  if (!wasOpen) {
+    // Calculate position after dropdown opens
+    nextTick(() => {
+      calculateDropdownPosition(taskId)
+    })
+  } else {
+    // Clean up position data when closing
+    delete dropdownPositions.value[taskId]
+    delete dropdownRefs.value[taskId]
+  }
+}
+
+const setDropdownRef = (el: any, taskId: string) => {
+  if (el && el instanceof HTMLElement) {
+    dropdownRefs.value[taskId] = el
+  }
+}
+
+const calculateDropdownPosition = (taskId: string) => {
+  const dropdown = dropdownRefs.value[taskId]
+  if (!dropdown) return
+
+  const rect = dropdown.getBoundingClientRect()
+  const viewportHeight = window.innerHeight
+  const viewportWidth = window.innerWidth
+  
+  // Add buffer to prevent dropdown from being too close to viewport edges
+  const buffer = 20
+  
+  // Check if dropdown goes below viewport (considering dropdown height)
+  const dropdownHeight = 240 // Approximate height based on content
+  const wouldOverflowBottom = rect.top + dropdownHeight > viewportHeight - buffer
+  
+  // Check if dropdown goes beyond right edge
+  const wouldOverflowRight = rect.right > viewportWidth - buffer
+
+  dropdownPositions.value[taskId] = {
+    top: wouldOverflowBottom,
+    right: wouldOverflowRight
+  }
+}
+
+const getDropdownClasses = (taskId: string) => {
+  const position = dropdownPositions.value[taskId] || {}
+  
+  const classes = []
+  
+  if (position.top) {
+    classes.push('bottom-full', 'mb-2')
+  } else {
+    classes.push('top-full', 'mt-2')
+  }
+  
+  if (position.right) {
+    classes.push('left-0')
+  } else {
+    classes.push('right-0')
+  }
+  
+  return classes.join(' ')
 }
 
 const updateStatus = async (taskId: string, status: string) => {
@@ -548,16 +614,35 @@ const isOverdue = (task: any) => {
 // Close dropdown when clicking outside
 const closeDropdowns = () => {
   openDropdown.value = null
+  // Clean up all position data
+  dropdownPositions.value = {}
+  dropdownRefs.value = {}
+}
+
+// Handle window resize to recalculate dropdown positions
+const handleResize = () => {
+  if (openDropdown.value) {
+    nextTick(() => {
+      calculateDropdownPosition(openDropdown.value!)
+    })
+  }
 }
 
 // Lifecycle
 onMounted(async () => {
   await loadTasks()
   document.addEventListener('click', closeDropdowns)
+  window.addEventListener('resize', handleResize)
 })
 
 // Cleanup
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns)
+  window.removeEventListener('resize', handleResize)
+})
+
 watch(() => router.currentRoute.value, () => {
   document.removeEventListener('click', closeDropdowns)
+  window.removeEventListener('resize', handleResize)
 })
 </script>
