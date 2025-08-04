@@ -111,7 +111,7 @@ class Application {
       },
       credentials: process.env.CORS_CREDENTIALS === 'true',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'cache-control', 'x-requested-with'],
       exposedHeaders: ['X-Total-Count', 'X-Page-Count']
     };
 
