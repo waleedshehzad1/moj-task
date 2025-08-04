@@ -395,6 +395,7 @@ const openDropdown = ref<string | null>(null)
 const showDeleteModal = ref(false)
 const taskToDelete = ref<string | null>(null)
 const deleteModalMessage = ref('')
+const isBulkDelete = ref(false)
 const dropdownPositions = ref<Record<string, { top?: boolean; right?: boolean }>>({})
 const dropdownRefs = ref<Record<string, HTMLElement>>({})
 
@@ -566,19 +567,29 @@ const updateStatus = async (taskId: string, status: string) => {
 
 const deleteTask = (taskId: string) => {
   taskToDelete.value = taskId
+  isBulkDelete.value = false
   deleteModalMessage.value = 'Are you sure you want to delete this task? This action cannot be undone.'
   showDeleteModal.value = true
 }
 
 const confirmDelete = async () => {
-  if (taskToDelete.value) {
-    try {
+  try {
+    if (isBulkDelete.value) {
+      // Handle bulk deletion
+      const promises = selectedTasks.value.map(taskId => 
+        taskStore.deleteTask(taskId)
+      )
+      await Promise.all(promises)
+      toast.success(`${selectedTasks.value.length} task${selectedTasks.value.length !== 1 ? 's' : ''} deleted successfully`)
+      selectedTasks.value = []
+    } else if (taskToDelete.value) {
+      // Handle single task deletion
       await taskStore.deleteTask(taskToDelete.value)
       toast.success('Task deleted successfully')
       selectedTasks.value = selectedTasks.value.filter(id => id !== taskToDelete.value)
-    } catch (error) {
-      toast.error('Failed to delete task')
     }
+  } catch (error) {
+    toast.error('Failed to delete task(s)')
   }
   cancelDelete()
 }
@@ -587,6 +598,7 @@ const cancelDelete = () => {
   showDeleteModal.value = false
   taskToDelete.value = null
   deleteModalMessage.value = ''
+  isBulkDelete.value = false
 }
 
 const bulkUpdateStatus = async (status: string) => {
@@ -603,6 +615,8 @@ const bulkUpdateStatus = async (status: string) => {
 }
 
 const bulkDelete = () => {
+  isBulkDelete.value = true
+  taskToDelete.value = null
   deleteModalMessage.value = `Are you sure you want to delete ${selectedTasks.value.length} task${selectedTasks.value.length !== 1 ? 's' : ''}? This action cannot be undone.`
   showDeleteModal.value = true
 }
