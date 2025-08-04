@@ -1,16 +1,13 @@
 const request = require('supertest');
-const app = require('../../src/app');
-const { Task, User, sequelize } = require('../../src/models');
+const app = require('../../app');
+const { Task, User } = require('../../models');
 
 describe('Task Controller', () => {
   let testUser;
   let testTask;
 
   beforeAll(async () => {
-    // Set up test database
-    await sequelize.sync({ force: true });
-    
-    // Create test user
+    // Create test user (database setup is handled by global setup)
     testUser = await User.create({
       email: 'test@example.com',
       username: 'testuser',
@@ -23,9 +20,7 @@ describe('Task Controller', () => {
     });
   });
 
-  afterAll(async () => {
-    await sequelize.close();
-  });
+  // Remove afterAll as it's handled by global teardown
 
   beforeEach(async () => {
     // Clean up tasks before each test
@@ -230,8 +225,8 @@ describe('Task Controller', () => {
 
       const tasks = response.body.data;
       expect(tasks).toHaveLength(3);
-      expect(new Date(tasks[0].due_date)).toBeLessThanOrEqual(new Date(tasks[1].due_date));
-      expect(new Date(tasks[1].due_date)).toBeLessThanOrEqual(new Date(tasks[2].due_date));
+      expect(new Date(tasks[0].due_date).getTime()).toBeLessThanOrEqual(new Date(tasks[1].due_date).getTime());
+      expect(new Date(tasks[1].due_date).getTime()).toBeLessThanOrEqual(new Date(tasks[2].due_date).getTime());
     });
 
     it('should implement pagination correctly', async () => {
@@ -439,7 +434,7 @@ describe('Task Controller', () => {
 
       // Verify task is soft deleted
       const deletedTask = await Task.findByPk(testTask.id, { paranoid: false });
-      expect(deletedTask.deleted_at).toBeTruthy();
+      expect(deletedTask.deletedAt).toBeTruthy(); // Use camelCase deletedAt
     });
 
     it('should delete a cancelled task', async () => {

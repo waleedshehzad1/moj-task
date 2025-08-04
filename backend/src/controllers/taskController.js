@@ -511,6 +511,16 @@ class TaskController {
         });
       }
 
+      // Check if any fields are provided for update
+      const updateFields = Object.keys(req.body);
+      if (updateFields.length === 0) {
+        return res.status(400).json({
+          error: 'ValidationError',
+          message: 'At least one field must be provided for update',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // Validate assigned user if being updated
       if (req.body.assigned_to && req.body.assigned_to !== task.assigned_to) {
         const assignedUser = await User.findByPk(req.body.assigned_to);

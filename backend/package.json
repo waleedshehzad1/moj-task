@@ -6,9 +6,11 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "jest --coverage --detectOpenHandles",
+    "test": "node setup-test-db.js && jest --coverage --detectOpenHandles",
     "test:watch": "jest --watch",
-    "test:ci": "jest --coverage --watchAll=false --ci --detectOpenHandles",
+    "test:ci": "node setup-test-db.js && jest --coverage --watchAll=false --ci --detectOpenHandles",
+    "test:setup": "node setup-test-db.js",
+    "test:verify": "node verify-setup.js",
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
     "db:migrate": "npx sequelize-cli db:migrate",

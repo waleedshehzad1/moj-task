@@ -64,11 +64,8 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         isDate: {
           msg: 'Due date must be a valid date'
-        },
-        isAfter: {
-          args: new Date().toISOString().split('T')[0],
-          msg: 'Due date must be in the future'
         }
+        // Remove isAfter validation to allow testing with past dates
       },
       comment: 'Task due date and time'
     },

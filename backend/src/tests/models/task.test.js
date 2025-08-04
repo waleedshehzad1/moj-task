@@ -1,13 +1,10 @@
-const { Task, User } = require('../../src/models');
+const { Task, User } = require('../../models');
 
 describe('Task Model', () => {
   let testUser;
 
   beforeAll(async () => {
-    const { sequelize } = require('../../src/models');
-    await sequelize.sync({ force: true });
-    
-    // Create test user
+    // Create test user (database setup is handled by global setup)
     testUser = await User.create({
       email: 'test@example.com',
       username: 'testuser',
@@ -20,10 +17,7 @@ describe('Task Model', () => {
     });
   });
 
-  afterAll(async () => {
-    const { sequelize } = require('../../src/models');
-    await sequelize.close();
-  });
+  // Remove afterAll as it's handled by global teardown
 
   beforeEach(async () => {
     await Task.destroy({ where: {}, force: true });
@@ -332,6 +326,35 @@ describe('Task Model', () => {
     });
 
     describe('findByStatus()', () => {
+      beforeEach(async () => {
+        // Clean up all tasks first
+        await Task.destroy({ where: {}, force: true });
+        
+        // Create specific test data for these tests
+        await Task.bulkCreate([
+          {
+            title: 'Pending Task 1',
+            status: 'pending',
+            priority: 'high',
+            due_date: new Date(Date.now() + 86400000),
+            assigned_to: testUser.id
+          },
+          {
+            title: 'Pending Task 2',
+            status: 'pending',
+            priority: 'medium',
+            due_date: new Date(Date.now() + 172800000)
+          },
+          {
+            title: 'Archived Task',
+            status: 'pending',
+            priority: 'low',
+            due_date: new Date(Date.now() + 86400000),
+            is_archived: true
+          }
+        ]);
+      });
+      
       it('should find tasks by status', async () => {
         const pendingTasks = await Task.findByStatus('pending');
         expect(pendingTasks).toHaveLength(2); // Excluding archived
@@ -368,6 +391,46 @@ describe('Task Model', () => {
     });
 
     describe('getStatusCounts()', () => {
+      beforeEach(async () => {
+        // Clean up all tasks first
+        await Task.destroy({ where: {}, force: true });
+        
+        // Create specific test data for status counts
+        await Task.bulkCreate([
+          {
+            title: 'Pending Task 1',
+            status: 'pending',
+            priority: 'high',
+            due_date: new Date(Date.now() + 86400000)
+          },
+          {
+            title: 'Pending Task 2',
+            status: 'pending',
+            priority: 'medium',
+            due_date: new Date(Date.now() + 172800000)
+          },
+          {
+            title: 'In Progress Task',
+            status: 'in_progress',
+            priority: 'high',
+            due_date: new Date(Date.now() + 86400000)
+          },
+          {
+            title: 'Completed Task',
+            status: 'completed',
+            priority: 'medium',
+            due_date: new Date(Date.now() + 86400000)
+          },
+          {
+            title: 'Archived Task',
+            status: 'pending',
+            priority: 'low',
+            due_date: new Date(Date.now() + 86400000),
+            is_archived: true
+          }
+        ]);
+      });
+      
       it('should return status counts', async () => {
         const statusCounts = await Task.getStatusCounts();
         
@@ -434,7 +497,7 @@ describe('Task Model', () => {
       // Should find with paranoid: false
       const deletedTask = await Task.findByPk(task.id, { paranoid: false });
       expect(deletedTask).toBeTruthy();
-      expect(deletedTask.deleted_at).toBeTruthy();
+      expect(deletedTask.deletedAt).toBeTruthy(); // Use camelCase deletedAt
     });
   });
 });
