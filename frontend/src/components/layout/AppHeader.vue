@@ -1,18 +1,25 @@
 <template>
   <header class="bg-white shadow-sm border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-16">
+      <div class="flex justify-between items-center h-20">
         <!-- Logo and Title -->
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="h-8 w-8 bg-blue-600 rounded flex items-center justify-center">
-              <span class="text-white font-bold text-sm">H</span>
-            </div>
+            <img 
+              src="/src/assets/hmcts-logo.png" 
+              alt="HMCTS Logo" 
+              class="h-10 w-auto"
+            />
           </div>
           <div class="ml-4">
-            <h1 class="text-xl font-semibold text-gray-900">
-              Task Management
-            </h1>
+            <div class="flex flex-col">
+              <h1 class="text-lg font-semibold text-gray-900 leading-tight">
+                HM Courts & Tribunals Service
+              </h1>
+              <span class="text-sm text-gray-600 font-medium">
+                Task Management System
+              </span>
+            </div>
           </div>
         </div>
 
