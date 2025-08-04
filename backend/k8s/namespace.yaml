@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hmcts-task-api
+  labels:
+    app: hmcts-task-api
+    environment: production
+    team: hmcts-platform
+    cost-center: hmcts-digital
+  annotations:
+    kubernetes.io/managed-by: "HMCTS Platform Team"
+    contact: "hmcts-platform@justice.gov.uk"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: resource-limits
+  namespace: hmcts-task-api
+spec:
+  limits:
+  - default:
+      memory: "1Gi"
+      cpu: "500m"
+    defaultRequest:
+      memory: "256Mi"
+      cpu: "100m"
+    type: Container
+  - max:
+      memory: "4Gi"
+      cpu: "2"
+    min:
+      memory: "64Mi"
+      cpu: "50m"
+    type: Container
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resource-quota
+  namespace: hmcts-task-api
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    persistentvolumeclaims: "5"

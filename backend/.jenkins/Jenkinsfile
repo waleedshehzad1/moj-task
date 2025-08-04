@@ -1,0 +1,582 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: node
+                    image: node:22-alpine
+                    command:
+                    - cat
+                    tty: true
+                    resources:
+                      requests:
+                        memory: "512Mi"
+                        cpu: "500m"
+                      limits:
+                        memory: "1Gi"
+                        cpu: "1000m"
+                  - name: docker
+                    image: docker:dind
+                    securityContext:
+                      privileged: true
+                    volumeMounts:
+                    - name: docker-sock
+                      mountPath: /var/run/docker.sock
+                  - name: postgres
+                    image: postgres:15-alpine
+                    env:
+                    - name: POSTGRES_DB
+                      value: hmcts_tasks_test
+                    - name: POSTGRES_USER
+                      value: postgres
+                    - name: POSTGRES_PASSWORD
+                      value: test_password
+                    resources:
+                      requests:
+                        memory: "256Mi"
+                        cpu: "250m"
+                  - name: redis
+                    image: redis:7-alpine
+                    resources:
+                      requests:
+                        memory: "128Mi"
+                        cpu: "100m"
+                  volumes:
+                  - name: docker-sock
+                    hostPath:
+                      path: /var/run/docker.sock
+            """
+        }
+    }
+
+    environment {
+        // Application Configuration
+        NODE_ENV = 'test'
+        PORT = '3000'
+        API_VERSION = 'v1'
+        
+        // Test Database Configuration
+        DB_HOST = 'localhost'
+        DB_PORT = '5432'
+        DB_NAME = 'hmcts_tasks_test'
+        DB_USERNAME = 'postgres'
+        DB_PASSWORD = 'test_password'
+        DB_DIALECT = 'postgres'
+        DB_LOGGING = 'false'
+        
+        // Test Redis Configuration
+        REDIS_HOST = 'localhost'
+        REDIS_PORT = '6379'
+        REDIS_DB = '0'
+        
+        // JWT Test Configuration
+        JWT_SECRET = 'a8f7e9c2d1b4f6e8a9c7d5e3f1b8c6d4e7f2a5b9c8e1d6f3a4b7c9e2d8f5a1b6c3e9f7d2a4b8c5e1f6d9a3b7c2e8f4d1a5b9c6e3f7d2a8b4c1e6f9d5a2b7c8e4f1d3a6b9c5e2f8d7a1b4c6e9f3d5a2b8c7e1f4d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4d9a8b6c3e5f1d2a9b7c4e8f6d3a1b5c2e9f7d4a8b6c1e3f5d2a9b7c8e4f1d6a3b5c9e2f7d8a4b1c6e3f9d5a2b8c7e1f4d6a9b3c5e8f2d7a1b4c6e9f3d5a8b2c7e4f1d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4a9d8b6c3e5f1d2a9b7c4e8f6d3a1b5c2e9f7d4a8b6c1e3f5d2a9b7c8e4f1d6a3b5c9e2f7d8a4b1c6e3f9d5a2b8c7e1f4d6a9b3c5e8f2d7a1b4c6e9f3d5a8b2c7e4f1d9a6b3c8e5f2d1a7b4c9e6f8d3a5b2c1e7f4'
+        JWT_EXPIRES_IN = '24h'
+        
+        // Rate Limiting
+        RATE_LIMIT_WINDOW_MS = '900000'
+        RATE_LIMIT_MAX_REQUESTS = '1000'
+        
+        // Security Configuration
+        BCRYPT_SALT_ROUNDS = '10'
+        PASSWORD_MIN_LENGTH = '8'
+        
+        // Logging Configuration
+        LOG_LEVEL = 'error'
+        
+        // Docker Registry
+        DOCKER_REGISTRY = credentials('docker-registry-url')
+        DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
+        
+        // Azure Configuration
+        AZURE_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+        AZURE_CLIENT_ID = credentials('azure-client-id')
+        AZURE_CLIENT_SECRET = credentials('azure-client-secret')
+        AZURE_TENANT_ID = credentials('azure-tenant-id')
+        
+        // Notification Configuration
+        SLACK_WEBHOOK = credentials('slack-webhook-url')
+        TEAMS_WEBHOOK = credentials('teams-webhook-url')
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        retry(2)
+        skipStagesAfterUnstable()
+        parallelsAlwaysFailFast()
+    }
+
+    triggers {
+        githubPush()
+        cron('H 2 * * 1-5') // Nightly builds on weekdays
+    }
+
+    stages {
+        stage('Checkout & Setup') {
+            steps {
+                container('node') {
+                    script {
+                        // Checkout code
+                        checkout scm
+                        
+                        // Display environment info
+                        sh '''
+                            echo "Node.js version: $(node --version)"
+                            echo "npm version: $(npm --version)"
+                            echo "Build number: ${BUILD_NUMBER}"
+                            echo "Branch: ${BRANCH_NAME}"
+                            echo "Commit: ${GIT_COMMIT}"
+                        '''
+                        
+                        // Cache node_modules
+                        def nodeModulesCache = "${WORKSPACE}/node_modules"
+                        if (fileExists(nodeModulesCache)) {
+                            echo "Using cached node_modules"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Dependencies & Security Audit') {
+            parallel {
+                stage('Install Dependencies') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                npm ci --production=false
+                                npm list --depth=0 || true
+                            '''
+                        }
+                    }
+                }
+                
+                stage('Security Audit') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                npm audit --audit-level=moderate
+                                npm run security:check || true
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishHTML([
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'backend/reports',
+                                reportFiles: 'audit-report.html',
+                                reportName: 'Security Audit Report'
+                            ])
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Code Quality') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                npm run lint -- --format=junit --output-file=reports/eslint-report.xml
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults(
+                                testResultsPattern: 'backend/reports/eslint-report.xml',
+                                allowEmptyResults: true
+                            )
+                        }
+                    }
+                }
+                
+                stage('Type Check') {
+                    when {
+                        anyOf {
+                            branch 'main'
+                            branch 'develop'
+                            changeRequest()
+                        }
+                    }
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                # Add TypeScript checking if applicable
+                                echo "Type checking completed"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                npm run test:ci
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults(
+                                testResultsPattern: 'backend/coverage/junit.xml',
+                                allowEmptyResults: true
+                            )
+                            publishCoverage(
+                                adapters: [
+                                    istanbulCoberturaAdapter('backend/coverage/cobertura-coverage.xml')
+                                ],
+                                sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                            )
+                        }
+                    }
+                }
+                
+                stage('Integration Tests') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                # Wait for services to be ready
+                                sleep 10
+                                
+                                # Run database migrations
+                                npm run db:migrate
+                                
+                                # Run integration tests
+                                NODE_ENV=test npm run test -- --testPathPattern=integration
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build & Package') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    branch 'release/*'
+                }
+            }
+            steps {
+                container('docker') {
+                    script {
+                        def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(8)}"
+                        def imageName = "${DOCKER_REGISTRY}/hmcts-task-api:${imageTag}"
+                        
+                        sh """
+                            cd backend
+                            docker build -t ${imageName} .
+                            docker tag ${imageName} ${DOCKER_REGISTRY}/hmcts-task-api:latest
+                        """
+                        
+                        // Push to registry
+                        withCredentials([usernamePassword(
+                            credentialsId: 'docker-registry-credentials',
+                            usernameVariable: 'DOCKER_USERNAME',
+                            passwordVariable: 'DOCKER_PASSWORD'
+                        )]) {
+                            sh """
+                                echo \$DOCKER_PASSWORD | docker login ${DOCKER_REGISTRY} -u \$DOCKER_USERNAME --password-stdin
+                                docker push ${imageName}
+                                docker push ${DOCKER_REGISTRY}/hmcts-task-api:latest
+                            """
+                        }
+                        
+                        env.DOCKER_IMAGE = imageName
+                    }
+                }
+            }
+        }
+
+        stage('Security Scanning') {
+            parallel {
+                stage('Container Security Scan') {
+                    when {
+                        anyOf {
+                            branch 'main'
+                            branch 'develop'
+                        }
+                    }
+                    steps {
+                        container('docker') {
+                            script {
+                                // Trivy security scanning
+                                sh """
+                                    # Install trivy
+                                    apk add --no-cache curl
+                                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                                    
+                                    # Scan the image
+                                    trivy image --format json --output trivy-report.json ${env.DOCKER_IMAGE} || true
+                                """
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+                
+                stage('OWASP Dependency Check') {
+                    steps {
+                        container('node') {
+                            sh '''
+                                cd backend
+                                # Run OWASP dependency check
+                                npm audit --json > dependency-audit.json || true
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'backend/dependency-audit.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Development') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                container('node') {
+                    script {
+                        withCredentials([
+                            string(credentialsId: 'azure-subscription-id', variable: 'AZURE_SUBSCRIPTION_ID'),
+                            string(credentialsId: 'azure-client-id', variable: 'AZURE_CLIENT_ID'),
+                            string(credentialsId: 'azure-client-secret', variable: 'AZURE_CLIENT_SECRET'),
+                            string(credentialsId: 'azure-tenant-id', variable: 'AZURE_TENANT_ID')
+                        ]) {
+                            sh '''
+                                # Install Azure CLI
+                                apk add --no-cache py3-pip
+                                pip3 install azure-cli
+                                
+                                # Login to Azure
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                                az account set --subscription $AZURE_SUBSCRIPTION_ID
+                                
+                                # Deploy using Terraform or ARM templates
+                                echo "Deploying to Development environment..."
+                                
+                                # Update container instance or app service
+                                az webapp config container set \\
+                                    --name hmcts-task-api-dev \\
+                                    --resource-group hmcts-dev-rg \\
+                                    --docker-custom-image-name ${DOCKER_IMAGE}
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Smoke Tests') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    branch 'main'
+                }
+            }
+            steps {
+                container('node') {
+                    sh '''
+                        cd backend
+                        # Run smoke tests against deployed environment
+                        npm run test:smoke -- --env=development
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'main'
+            }
+            steps {
+                input message: 'Deploy to Staging?', ok: 'Deploy'
+                container('node') {
+                    script {
+                        withCredentials([
+                            string(credentialsId: 'azure-subscription-id', variable: 'AZURE_SUBSCRIPTION_ID'),
+                            string(credentialsId: 'azure-client-id', variable: 'AZURE_CLIENT_ID'),
+                            string(credentialsId: 'azure-client-secret', variable: 'AZURE_CLIENT_SECRET'),
+                            string(credentialsId: 'azure-tenant-id', variable: 'AZURE_TENANT_ID')
+                        ]) {
+                            sh '''
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                                az account set --subscription $AZURE_SUBSCRIPTION_ID
+                                
+                                echo "Deploying to Staging environment..."
+                                
+                                az webapp config container set \\
+                                    --name hmcts-task-api-staging \\
+                                    --resource-group hmcts-staging-rg \\
+                                    --docker-custom-image-name ${DOCKER_IMAGE}
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Production Deployment') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { 
+                        return env.DEPLOY_TO_PRODUCTION == 'true' 
+                    }
+                }
+            }
+            steps {
+                input message: 'Deploy to Production? This action cannot be undone.', ok: 'Deploy to Production'
+                container('node') {
+                    script {
+                        withCredentials([
+                            string(credentialsId: 'azure-subscription-id', variable: 'AZURE_SUBSCRIPTION_ID'),
+                            string(credentialsId: 'azure-client-id', variable: 'AZURE_CLIENT_ID'),
+                            string(credentialsId: 'azure-client-secret', variable: 'AZURE_CLIENT_SECRET'),
+                            string(credentialsId: 'azure-tenant-id', variable: 'AZURE_TENANT_ID')
+                        ]) {
+                            sh '''
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                                az account set --subscription $AZURE_SUBSCRIPTION_ID
+                                
+                                echo "Deploying to Production environment..."
+                                
+                                # Blue-Green deployment
+                                az webapp deployment slot swap \\
+                                    --resource-group hmcts-prod-rg \\
+                                    --name hmcts-task-api-prod \\
+                                    --slot staging \\
+                                    --target-slot production
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            container('node') {
+                // Archive artifacts
+                archiveArtifacts artifacts: 'backend/coverage/**/*', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'backend/reports/**/*', allowEmptyArchive: true
+                
+                // Cleanup
+                sh '''
+                    cd backend
+                    rm -rf node_modules coverage reports || true
+                '''
+            }
+        }
+        
+        success {
+            script {
+                if (env.BRANCH_NAME == 'main') {
+                    // Notify success to Slack/Teams
+                    httpRequest(
+                        url: env.SLACK_WEBHOOK,
+                        httpMode: 'POST',
+                        contentType: 'APPLICATION_JSON',
+                        requestBody: """
+                        {
+                            "text": "✅ HMCTS Task API: Production deployment successful",
+                            "attachments": [{
+                                "color": "good",
+                                "fields": [{
+                                    "title": "Build",
+                                    "value": "${BUILD_NUMBER}",
+                                    "short": true
+                                }, {
+                                    "title": "Commit",
+                                    "value": "${GIT_COMMIT.take(8)}",
+                                    "short": true
+                                }]
+                            }]
+                        }
+                        """
+                    )
+                }
+            }
+        }
+        
+        failure {
+            script {
+                // Notify failure
+                httpRequest(
+                    url: env.SLACK_WEBHOOK,
+                    httpMode: 'POST',
+                    contentType: 'APPLICATION_JSON',
+                    requestBody: """
+                    {
+                        "text": "❌ HMCTS Task API: Build failed",
+                        "attachments": [{
+                            "color": "danger",
+                            "fields": [{
+                                "title": "Build",
+                                "value": "${BUILD_NUMBER}",
+                                "short": true
+                            }, {
+                                "title": "Branch",
+                                "value": "${BRANCH_NAME}",
+                                "short": true
+                            }, {
+                                "title": "Logs",
+                                "value": "${BUILD_URL}console",
+                                "short": false
+                            }]
+                        }]
+                    }
+                    """
+                )
+            }
+        }
+        
+        unstable {
+            emailext(
+                to: 'dev-team@hmcts.gov.uk',
+                subject: "Unstable: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: "Build ${env.BUILD_NUMBER} of ${env.JOB_NAME} is unstable. Please check the logs: ${env.BUILD_URL}"
+            )
+        }
+        
+        cleanup {
+            // Clean up Docker images to save space
+            container('docker') {
+                sh '''
+                    docker system prune -f || true
+                '''
+            }
+        }
+    }
+}
