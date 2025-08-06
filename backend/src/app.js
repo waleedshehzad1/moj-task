@@ -22,6 +22,7 @@ const { setupDatabase } = require('./database/setup');
 const { sanitizeInput } = require('./middleware/sanitizeInput');
 const { validateApiKey } = require('./middleware/validateApiKey');
 const { auditLogger } = require('./middleware/auditLogger');
+const metricsCollector = require('./monitoring/metrics');
 
 class Application {
   constructor() {
@@ -152,6 +153,9 @@ class Application {
 
     // Audit logging middleware
     this.app.use(auditLogger);
+
+    // Prometheus metrics middleware
+    this.app.use(metricsCollector.middleware());
 
     // Health check endpoint (before API key validation)
     this.app.get('/health', (req, res) => {

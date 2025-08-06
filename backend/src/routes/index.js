@@ -1,6 +1,7 @@
 const express = require('express');
 const tasksRouter = require('./tasks');
 const authRouter = require('./auth');
+const metricsCollector = require('../monitoring/metrics');
 
 const router = express.Router();
 
@@ -55,5 +56,16 @@ router.get('/', (req, res) => {
 // Mount route modules
 router.use('/auth', authRouter);
 router.use('/tasks', tasksRouter);
+
+// Prometheus metrics endpoint
+router.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await metricsCollector.getMetrics();
+    res.set('Content-Type', 'text/plain');
+    res.send(metrics);
+  } catch (error) {
+    res.status(500).send('Error collecting metrics');
+  }
+});
 
 module.exports = router;
