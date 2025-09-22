@@ -1,5 +1,7 @@
 const { DataTypes } = require('sequelize');
 
+// Task model defines the core domain entity for the API.
+// Soft-deletes are enabled (paranoid). Hooks maintain completed_at/archived_at.
 module.exports = (sequelize, DataTypes) => {
   const Task = sequelize.define('Task', {
     id: {
@@ -34,7 +36,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Optional task description'
     },
-    status: {
+  // Lifecycle status — business rules depend on this
+  status: {
       type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled'),
       allowNull: false,
       defaultValue: 'pending',
@@ -46,7 +49,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Current status of the task'
     },
-    priority: {
+  // Operational urgency used for dashboards/filters
+  priority: {
       type: DataTypes.ENUM('low', 'medium', 'high', 'urgent'),
       allowNull: false,
       defaultValue: 'medium',
@@ -58,7 +62,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Task priority level'
     },
-    due_date: {
+  // Due date used for overdue detection and planning
+  due_date: {
       type: DataTypes.DATE,
       allowNull: false,
       validate: {
@@ -69,7 +74,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Task due date and time'
     },
-    assigned_to: {
+  // FK to users.id — nullable (unassigned tasks allowed)
+  assigned_to: {
       type: DataTypes.UUID,
       allowNull: true,
       references: {
@@ -80,7 +86,8 @@ module.exports = (sequelize, DataTypes) => {
       onUpdate: 'CASCADE',
       comment: 'ID of the caseworker assigned to this task'
     },
-    created_by: {
+  // FK to users.id for audit trail of creator
+  created_by: {
       type: DataTypes.UUID,
       allowNull: true,
       references: {
@@ -96,7 +103,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'Timestamp when the task was completed'
     },
-    estimated_hours: {
+  // Estimate used for planning/capacity reports
+  estimated_hours: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
       validate: {
@@ -111,7 +119,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Estimated time to complete the task in hours'
     },
-    actual_hours: {
+  // Captured post-completion or during progress updates
+  actual_hours: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
       validate: {
@@ -126,19 +135,22 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Actual time spent on the task in hours'
     },
-    tags: {
+  // Free-form labels to aid search and grouping
+  tags: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       allowNull: true,
       defaultValue: [],
       comment: 'Array of tags for categorizing tasks'
     },
-    metadata: {
+  // Arbitrary JSON for extensibility without schema changes
+  metadata: {
       type: DataTypes.JSONB,
       allowNull: true,
       defaultValue: {},
       comment: 'Additional metadata for the task'
     },
-    is_archived: {
+  // Soft archive flag separate from soft-delete (paranoid)
+  is_archived: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,

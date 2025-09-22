@@ -1,8 +1,11 @@
 const logger = require('../utils/logger');
 
 /**
- * API Key validation middleware for service-to-service authentication
- * Implements secure API key validation following OWASP guidelines
+ * API Key validation middleware (service-to-service)
+ *
+ * Looks for X-API-Key header (or api_key query), validates format and
+ * checks against allowed keys (env/secret store in prod). Skips known
+ * public endpoints. Attaches a redacted key prefix to req for auditing.
  */
 const validateApiKey = (req, res, next) => {
   try {

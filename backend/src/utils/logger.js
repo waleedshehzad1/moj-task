@@ -1,3 +1,6 @@
+// Structured application logger
+// JSON logs for production; colorful console for dev. Provides helpers for
+// audit/security/performance/database logging with consistent metadata.
 const winston = require('winston');
 const path = require('path');
 

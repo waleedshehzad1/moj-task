@@ -2,8 +2,12 @@ const xss = require('xss');
 const logger = require('../utils/logger');
 
 /**
- * Input sanitization middleware to prevent XSS and injection attacks
- * Implements OWASP guidelines for input validation and sanitization
+ * Input sanitization middleware
+ *
+ * Defense-in-depth for untrusted inputs:
+ * - Recursively sanitizes req.body/query/params using a conservative policy
+ * - Strips HTML/XSS payloads and dangerous characters; trims extreme lengths
+ * Note: Primary SQL injection defense remains parameterized queries in ORM.
  */
 const sanitizeInput = (req, res, next) => {
   try {

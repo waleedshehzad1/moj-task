@@ -14,6 +14,8 @@ const {
   taskIdSchema
 } = require('../validation/taskValidation');
 
+// Task management routes
+// Secured with JWT + permission checks; inputs validated with schemas
 const router = express.Router();
 
 /**

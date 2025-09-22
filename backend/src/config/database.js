@@ -1,3 +1,6 @@
+// Sequelize environment configuration
+// Centralizes DB credentials/connection pools per environment.
+// Migrations use this file; app loads via src/models/index.js
 require('dotenv').config();
 
 module.exports = {

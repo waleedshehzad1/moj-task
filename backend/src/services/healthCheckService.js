@@ -4,6 +4,38 @@ const logger = require('../utils/logger');
 const metricsCollector = require('../monitoring/metrics');
 
 /**
+ * HealthCheckService
+ *
+ * Purpose:
+ * - Provide a single place to assess the health of core app dependencies and runtime.
+ * - Support multiple probe styles commonly used by load balancers and Kubernetes:
+ *   - runAllChecks: deep diagnostic report (used by a human/ops dashboard endpoint)
+ *   - getQuickStatus: fast, lightweight LB health check
+ *   - getReadinessStatus: readiness probe – is the app ready to serve traffic?
+ *   - getLivenessStatus: liveness probe – is the process alive?
+ *
+ * What is checked:
+ * - Database: connectivity + simple query performance + pool pressure signals
+ * - Redis: connectivity + ping latency + basic set/get roundtrip
+ * - Memory: current utilization with warning/critical thresholds
+ * - Disk: ability to write to the filesystem (simplified; OK for containers)
+ * - Environment: presence of required env vars and basic misconfig warnings
+ * - External dependencies: placeholder example using DNS resolution
+ *
+ * Status conventions:
+ * - "healthy": within nominal ranges
+ * - "warning": degraded but functioning (e.g., slow responses, high utilization)
+ * - "unhealthy": failed dependency or critical degradation
+ *
+ * Observability:
+ * - Metrics are recorded via metricsCollector.recordHealthCheck(status, duration)
+ * - Logs may be emitted by individual checks for debugging/operational context
+ *
+ * Note:
+ * - This service is read-only and non-destructive. It is safe to call frequently.
+ * - Thresholds are pragmatic defaults and can be tuned per environment.
+ */
+/**
  * Comprehensive Health Check Service
  * Monitors all critical system components and external dependencies
  */
@@ -17,6 +49,8 @@ class HealthCheckService {
    * Register all health check functions
    */
   registerHealthChecks() {
+    // Map of named checks -> functions executed by runAllChecks()
+    // Adding a new check is as simple as registering it here.
     this.checks.set('database', this.checkDatabase.bind(this));
     this.checks.set('redis', this.checkRedis.bind(this));
     this.checks.set('memory', this.checkMemory.bind(this));
@@ -47,6 +81,8 @@ class HealthCheckService {
     };
 
     // Run all health checks
+    // Each check returns its own status. We aggregate into a single picture and
+    // escalate overall status to `warning` or `unhealthy` as needed.
     for (const [name, checkFunction] of this.checks) {
       try {
         const checkResult = await checkFunction();
@@ -88,6 +124,7 @@ class HealthCheckService {
     results.duration = `${duration}ms`;
 
     // Record metrics
+    // Useful for alerting (e.g., count of unhealthy runs, average duration).
     metricsCollector.recordHealthCheck(results.status, duration);
 
     return results;
@@ -109,6 +146,8 @@ class HealthCheckService {
       const queryDuration = Date.now() - queryStartTime;
       
       // Get connection pool status
+      // These are internal pool signals and may differ across Sequelize versions.
+      // They provide a rough sense of pool pressure under sustained load.
       const pool = sequelize.connectionManager.pool;
       const poolStatus = {
         totalConnections: pool.size,
@@ -121,6 +160,7 @@ class HealthCheckService {
       let message = 'Database connection is healthy';
 
       // Check for performance issues
+      // Thresholds can be tuned; the intention is to signal degradation early.
       if (queryDuration > 1000) {
         status = 'warning';
         message = `Database response slow: ${queryDuration}ms`;
@@ -130,6 +170,7 @@ class HealthCheckService {
       }
 
       // Check connection pool
+      // Near-capacity pools can precede timeouts under peak traffic.
       if (poolStatus.totalConnections >= 25) {
         status = 'warning';
         message = 'Database connection pool near capacity';
@@ -173,6 +214,7 @@ class HealthCheckService {
       const pingDuration = Date.now() - pingStartTime;
 
       // Test set/get operations
+      // Validates basic read/write path and serialization behavior.
       const testKey = `health_check_${Date.now()}`;
       const testValue = 'test_value';
       
@@ -185,6 +227,7 @@ class HealthCheckService {
       let message = 'Redis connection is healthy';
 
       // Check performance
+      // Low-latency expectations keep cache hit paths fast.
       if (pingDuration > 100) {
         status = 'warning';
         message = `Redis response slow: ${pingDuration}ms`;
@@ -228,6 +271,7 @@ class HealthCheckService {
     let status = 'healthy';
     let message = `Memory utilization: ${memoryUtilization.toFixed(2)}%`;
 
+    // Thresholds geared towards early warning before OOM risk.
     if (memoryUtilization > 80) {
       status = 'warning';
       message = `High memory utilization: ${memoryUtilization.toFixed(2)}%`;
@@ -256,7 +300,8 @@ class HealthCheckService {
   async checkDisk() {
     try {
       // This is a simplified check - in production you'd use fs.stat or similar
-      // For now, we'll just check if we can write to the temp directory
+      // For containerized environments, a simple write/delete suffices for liveness
+      // while full capacity/IOPS checks would be handled by node/host monitoring.
       const fs = require('fs').promises;
       const path = require('path');
       const testFile = path.join(process.cwd(), 'temp_health_check.txt');
@@ -338,7 +383,8 @@ class HealthCheckService {
     const dependencies = [];
 
     // This is where you'd check external APIs, services, etc.
-    // For now, we'll just check if we can resolve DNS
+    // For now, we'll just check if we can resolve DNS. In real deployments,
+    // add explicit checks to critical upstream APIs with timeouts and SLAs.
     try {
       const dns = require('dns').promises;
       await dns.resolve('google.com');
@@ -382,6 +428,7 @@ class HealthCheckService {
         await redisClient.ping();
       }
 
+      // Keep this minimal – intended for fast edge/LB checks.
       return {
         status: 'healthy',
         timestamp: new Date().toISOString()
@@ -401,6 +448,7 @@ class HealthCheckService {
   async getReadinessStatus() {
     try {
       // Check if application is ready to serve requests
+      // Readiness implies core dependencies are OK (or at least not failing).
       const dbCheck = await this.checkDatabase();
       const redisCheck = await this.checkRedis();
 
@@ -429,6 +477,7 @@ class HealthCheckService {
    */
   async getLivenessStatus() {
     // Simple check to verify the application is running
+    // Liveness should not depend on external systems – only process viability.
     return {
       status: 'alive',
       uptime: process.uptime(),

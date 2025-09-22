@@ -7,8 +7,19 @@ const { redisClient } = require('../config/redis');
 
 /**
  * Authentication Controller
- * Handles user registration, login, logout, password reset, and token management
- * Implements OWASP security best practices
+ *
+ * Responsibilities:
+ * - Register/login/logout flows with password strength checks and account lockout
+ * - JWT access + refresh token issuance with issuer/audience claims
+ * - Refresh token rotation stored in Redis (revocable per-user)
+ * - Session metadata persisted in Redis for presence + last-activity tracking
+ * - Password reset (token-based) and profile management endpoints
+ *
+ * Security defenses:
+ * - Account lockout after repeated failed attempts
+ * - Always-success response for forgot password to avoid user enumeration
+ * - Strict JWT verification (issuer, audience) + expiry handling
+ * - Redaction in audit logs; no secrets returned in responses
  */
 class AuthController {
   /**
@@ -190,7 +201,7 @@ class AuthController {
       const clientIP = req.ip;
       const userAgent = req.get('User-Agent');
 
-      // Find user by email or username
+  // Find user by email; fall back to username to support both inputs
       // Convert email to lowercase for case-insensitive matching
       const lowercasedEmail = email.toLowerCase();
       
@@ -256,7 +267,7 @@ class AuthController {
         });
       }
 
-      // Validate password
+  // Validate password; on failure increment counters and possibly lock
       const isValidPassword = await user.validatePassword(password);
       
       if (!isValidPassword) {
@@ -281,10 +292,10 @@ class AuthController {
       // Reset failed login attempts on successful login
       await user.resetFailedLogins();
 
-      // Generate JWT tokens
+  // Generate short-lived access + longer-lived refresh tokens
       const { accessToken, refreshToken } = await AuthController.generateTokens(user);
 
-      // Store session in Redis and database
+  // Store session in Redis (fast/ephemeral). Database session storage could be added if needed.
       const sessionId = crypto.randomUUID();
       const sessionData = {
         userId: user.id,
@@ -304,7 +315,7 @@ class AuthController {
         );
       }
 
-      // Store refresh token securely
+      // Store refresh token securely per user for rotation/revocation
       if (redisClient && redisClient.isOpen) {
         await redisClient.setEx(
           `refresh_token:${user.id}`,
@@ -385,7 +396,7 @@ class AuthController {
         });
       }
 
-      // Verify refresh token
+  // Verify refresh token signature + claims, then ensure it matches the latest stored value
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
       const user = await User.findByPk(decoded.userId);
 
@@ -414,7 +425,7 @@ class AuthController {
       // Generate new tokens
       const { accessToken, refreshToken: newRefreshToken } = await AuthController.generateTokens(user);
 
-      // Update refresh token in Redis
+      // Rotate refresh token to reduce replay window
       if (redisClient && redisClient.isOpen) {
         await redisClient.setEx(
           `refresh_token:${user.id}`,
@@ -528,7 +539,7 @@ class AuthController {
         where: { email: email.toLowerCase() }
       });
 
-      // Always return success to prevent email enumeration
+  // Always return success regardless to prevent email enumeration
       const successResponse = {
         success: true,
         message: 'If an account with that email exists, a password reset link has been sent.',

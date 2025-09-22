@@ -16,6 +16,8 @@ const {
   updateProfileSchema
 } = require('../validation/authValidation');
 
+// Authentication and profile management routes
+// Middleware order matters: validation -> auth -> controller
 const router = express.Router();
 
 /**

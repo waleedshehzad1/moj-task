@@ -1,6 +1,8 @@
 const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
+// User model: authentication/authorization principal. Password hashes are stored
+// in password_hash with strong bcrypt salting. Soft-deletes enabled (paranoid).
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define('User', {
     id: {
@@ -40,7 +42,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Unique username'
     },
-    password_hash: {
+  // Stored as bcrypt hash; never exposed via toJSON
+  password_hash: {
       type: DataTypes.STRING(255),
       allowNull: false,
       comment: 'Hashed password'
@@ -204,6 +207,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   // Instance methods
+  // Redacts sensitive columns when serializing to API responses
   User.prototype.toJSON = function() {
     const values = { ...this.get() };
     
@@ -219,14 +223,17 @@ module.exports = (sequelize, DataTypes) => {
     return values;
   };
 
+  // Compares plaintext password with bcrypt hash
   User.prototype.validatePassword = async function(password) {
     return await bcrypt.compare(password, this.password_hash);
   };
 
+  // Lockout guard to throttle brute-force attacks
   User.prototype.isLocked = function() {
     return this.locked_until && this.locked_until > new Date();
   };
 
+  // Increment failure counter and set 30m lock when threshold reached
   User.prototype.incrementFailedLogins = async function() {
     this.failed_login_attempts += 1;
     
@@ -238,6 +245,7 @@ module.exports = (sequelize, DataTypes) => {
     await this.save();
   };
 
+  // Clear lock/failed counters on successful auth
   User.prototype.resetFailedLogins = async function() {
     this.failed_login_attempts = 0;
     this.locked_until = null;
@@ -249,6 +257,7 @@ module.exports = (sequelize, DataTypes) => {
     return `${this.first_name} ${this.last_name}`;
   };
 
+  // Coarse-grained RBAC mapping used by requirePermission()
   User.prototype.hasPermission = function(permission) {
     const rolePermissions = {
       admin: ['create', 'read', 'update', 'delete', 'manage_users', 'view_reports'],

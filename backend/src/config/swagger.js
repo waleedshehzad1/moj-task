@@ -1,3 +1,5 @@
+// Swagger/OpenAPI specification builder
+// Aggregates JSDoc annotations from routes/controllers/models into a UI-ready spec.
 const swaggerJSDoc = require('swagger-jsdoc');
 
 const options = {

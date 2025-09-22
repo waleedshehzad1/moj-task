@@ -5,8 +5,17 @@ const { Op } = require('sequelize');
 
 /**
  * Task Controller
- * Handles all task-related operations with comprehensive error handling,
- * caching, and security measures following OWASP guidelines
+ *
+ * Responsibilities:
+ * - Implements CRUD and stats endpoints for tasks
+ * - Enforces business rules (e.g., immutable archived/completed tasks)
+ * - Uses Sequelize transactions for consistency when modifying data
+ * - Integrates with Redis for read-side caching; invalidates on writes
+ * - Emits structured audit, security, and performance logs via logger
+ *
+ * Caching approach:
+ * - getAllTasks/getTaskById use short-lived Redis cache keys (namespaced with `cache:`)
+ * - Any writes (create/update/delete/status) call `invalidateTaskCaches` to prevent stale reads
  */
 class TaskController {
   /**
@@ -42,6 +51,7 @@ class TaskController {
     try {
       const startTime = process.hrtime.bigint();
       
+      // Attach authenticated creator id (if present) to support auditing/ownership.
       // Add creator information if user is authenticated
       if (req.user) {
         req.body.created_by = req.user.id;
@@ -59,7 +69,7 @@ class TaskController {
         }
       }
 
-      // Use transaction to ensure consistency
+  // Use a DB transaction so either all changes succeed or none do.
       const transaction = await sequelize.transaction();
       
       try {
@@ -83,7 +93,7 @@ class TaskController {
           transaction
         });
 
-        // Commit transaction first
+  // Commit before cache invalidation to avoid serving inconsistent data.
         await transaction.commit();
 
         // THEN invalidate caches after database is consistent
@@ -92,7 +102,7 @@ class TaskController {
         // Small delay to ensure cache invalidation propagates
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        // Log performance
+  // Operational logging for traceability and SLO/SLA reporting
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1000000;
         logger.logPerformance('CREATE_TASK', duration, { taskId: task.id });
@@ -239,7 +249,7 @@ class TaskController {
       };
       const cacheKey = `tasks:list:${JSON.stringify(normalizedQuery)}`;
       
-      // Try to get from cache first
+      // Cache-first read: improves list latency under heavy read load
       const cachedResult = await redisClient.cacheGet(cacheKey);
       if (cachedResult) {
         logger.debug('Returning cached task list');
@@ -286,7 +296,7 @@ class TaskController {
         order.push(['created_at', 'DESC']);
       }
 
-      // Execute query
+  // Execute main query with include() to hydrate assignee/creator display fields
       const { count, rows: tasks } = await Task.findAndCountAll({
         where,
         include: [
@@ -326,10 +336,10 @@ class TaskController {
         timestamp: new Date().toISOString()
       };
 
-      // Cache result for only 1 minute to reduce stale data issues
+  // Cache for 60s: balances speed vs. recency for dashboard-like views
       await redisClient.cacheSet(cacheKey, result, 60);
 
-      // Log performance
+      // Performance trace for observability dashboards
       const endTime = process.hrtime.bigint();
       const duration = Number(endTime - startTime) / 1000000;
       logger.logPerformance('GET_ALL_TASKS', duration, { 
@@ -388,7 +398,7 @@ class TaskController {
       const { id } = req.params;
       const startTime = process.hrtime.bigint();
 
-      // Try cache first
+      // Cache-first read for hot objects
       const cacheKey = `task:${id}`;
       const cachedTask = await redisClient.cacheGet(cacheKey);
       if (cachedTask) {
@@ -423,10 +433,10 @@ class TaskController {
         });
       }
 
-      // Cache task for 10 minutes
+  // Cache hot task for 10 minutes; invalidated on mutation
       await redisClient.cacheSet(cacheKey, task, 600);
 
-      // Log performance
+  // Performance trace for p99 analysis
       const endTime = process.hrtime.bigint();
       const duration = Number(endTime - startTime) / 1000000;
       logger.logPerformance('GET_TASK_BY_ID', duration, { taskId: id });
@@ -536,7 +546,7 @@ class TaskController {
       // Store original values for audit logging
       const originalValues = { ...task.dataValues };
 
-      // Use transaction for consistency
+  // Transaction to avoid partial updates under concurrent clients
       const transaction = await sequelize.transaction();
       
       try {
@@ -560,7 +570,7 @@ class TaskController {
           transaction
         });
 
-        // Commit transaction first
+  // Commit before cache bust to prevent serving phantom updates
         await transaction.commit();
 
         // THEN invalidate caches after database is consistent
@@ -569,7 +579,7 @@ class TaskController {
         // Small delay to ensure cache invalidation propagates
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        // Log performance
+  // Performance trace for capacity planning
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1000000;
         logger.logPerformance('UPDATE_TASK', duration, { taskId: id });
@@ -689,10 +699,10 @@ class TaskController {
       
       await task.update(updateData);
 
-      // Invalidate caches
+  // Cache bust ensures subsequent reads reflect latest status
       await TaskController.invalidateTaskCaches(id);
 
-      // Log performance
+  // Performance trace for high-churn status updates
       const endTime = process.hrtime.bigint();
       const duration = Number(endTime - startTime) / 1000000;
       logger.logPerformance('UPDATE_TASK_STATUS', duration, { taskId: id });
@@ -778,14 +788,14 @@ class TaskController {
       // Store task data for audit logging before deletion
       const taskData = { ...task.dataValues };
 
-      // Use transaction for consistency
+  // Transaction so delete + related side effects are atomic
       const transaction = await sequelize.transaction();
       
       try {
         // Soft delete (paranoid: true in model) within transaction
         await task.destroy({ transaction });
 
-        // Commit transaction first
+  // Commit before invalidation to avoid cache seeing non-existent ids
         await transaction.commit();
 
         // THEN invalidate caches after database is consistent
@@ -794,7 +804,7 @@ class TaskController {
         // Small delay to ensure cache invalidation propagates
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        // Log performance
+  // Performance trace to spot slow deletes (e.g., due to FK cascades)
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1000000;
         logger.logPerformance('DELETE_TASK', duration, { taskId: id });
@@ -847,7 +857,7 @@ class TaskController {
     try {
       const startTime = process.hrtime.bigint();
 
-      // Try cache first
+  // Cache-first for stats—cheap to recompute but read often by dashboards
       const cacheKey = 'task:stats';
       const cachedStats = await redisClient.cacheGet(cacheKey);
       if (cachedStats) {
@@ -897,7 +907,7 @@ class TaskController {
         timestamp: new Date().toISOString()
       };
 
-      // Cache for 5 minutes
+  // Cache stats for 5 minutes; write operations purge this key
       await redisClient.cacheSet(cacheKey, result, 300);
 
       // Log performance
@@ -932,7 +942,7 @@ class TaskController {
       try {
         const client = redisClient.client;
         if (client && client.keys) {
-          // Get all cache keys that match any task-related patterns
+          // Aggressively delete task-related caches (list/detail/derived views)
           const allCachePatterns = [
             'cache:tasks:list:*',     // getAllTasks cache
             'cache:task:*',           // individual task cache

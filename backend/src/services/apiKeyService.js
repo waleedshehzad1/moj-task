@@ -5,8 +5,9 @@ const logger = require('../utils/logger');
 
 /**
  * API Key Management Service
- * Provides secure API key generation, validation, and management
- * Following OWASP security best practices
+ *
+ * Generates and validates hashed API keys with prefixes, optional expiry,
+ * and permission scoping. Integrates with audit logging for lifecycle events.
  */
 class ApiKeyService {
   constructor() {

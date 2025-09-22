@@ -1,3 +1,6 @@
+// API Router (v1)
+// This module aggregates feature routers behind a versioned base path.
+// It also exposes a lightweight index endpoint to discover key routes.
 const express = require('express');
 const tasksRouter = require('./tasks');
 const authRouter = require('./auth');
@@ -34,6 +37,7 @@ const router = express.Router();
  *                   type: string
  *                   format: date-time
  */
+// Lightweight index endpoint: quick "is it alive" + navigation hints
 router.get('/', (req, res) => {
   res.json({
     success: true,
@@ -52,7 +56,7 @@ router.get('/', (req, res) => {
   });
 });
 
-// Mount route modules
+// Mount versioned route modules for clarity and separation of concerns
 router.use('/auth', authRouter);
 router.use('/tasks', tasksRouter);
 

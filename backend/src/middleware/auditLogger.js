@@ -2,8 +2,14 @@ const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * Audit logging middleware for tracking user actions and system events
- * Implements comprehensive audit trail following security best practices
+ * Audit logging middleware
+ *
+ * Correlates requests with a unique id, redacts sensitive headers/fields,
+ * intercepts res.json to capture outcome and latency, and emits:
+ * - HTTP_REQUEST / HTTP_RESPONSE for visibility
+ * - DATA_MODIFICATION events for mutating operations
+ * - ACCESS_DENIED on 401/403
+ * Also emits SLOW_REQUEST performance events for outliers.
  */
 const auditLogger = (req, res, next) => {
   // Generate unique request ID if not present

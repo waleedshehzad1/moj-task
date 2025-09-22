@@ -5,7 +5,11 @@ const { redisClient } = require('../config/redis');
 
 /**
  * JWT Authentication Middleware
- * Validates JWT tokens and populates req.user
+ *
+ * Validates the Authorization Bearer token, loads the user, and ensures:
+ * - account is active and not locked
+ * - session exists in Redis (presence + last-activity bump)
+ * Populates req.user and req.tokenPayload when valid.
  */
 const authenticateJWT = async (req, res, next) => {
   try {
@@ -67,7 +71,7 @@ const authenticateJWT = async (req, res, next) => {
       });
     }
 
-    // Check session validity if Redis is available
+  // Optional session check: require an active session in Redis for Zero-Trust posture
     if (redisClient && redisClient.isOpen) {
       const sessionKeys = await redisClient.keys(`session:*`);
       let validSession = false;
@@ -155,7 +159,9 @@ const authenticateJWT = async (req, res, next) => {
 
 /**
  * Optional JWT Authentication Middleware
- * Sets req.user if valid token is provided, but doesn't fail if no token
+ *
+ * Best for public endpoints that can enrich responses if the user is known
+ * but should not fail when no/invalid token is provided.
  */
 const optionalAuthenticateJWT = async (req, res, next) => {
   try {
@@ -195,6 +201,7 @@ const optionalAuthenticateJWT = async (req, res, next) => {
 
 /**
  * Role-based authorization middleware
+ * Usage: requireRole('admin','manager')
  */
 const requireRole = (...roles) => {
   return (req, res, next) => {
@@ -232,6 +239,7 @@ const requireRole = (...roles) => {
 
 /**
  * Permission-based authorization middleware
+ * Maps to `User.hasPermission(permission)` for coarse-grained checks.
  */
 const requirePermission = (permission) => {
   return (req, res, next) => {
@@ -269,7 +277,7 @@ const requirePermission = (permission) => {
 
 /**
  * Resource ownership middleware
- * Ensures user can only access their own resources or has admin/manager role
+ * Ensures user can only access their own resources unless admin/manager.
  */
 const requireOwnership = (userIdField = 'userId') => {
   return (req, res, next) => {

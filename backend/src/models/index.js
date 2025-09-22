@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const env = process.env.NODE_ENV || 'development';
 const dbConfig = config[env];
 
-// Initialize Sequelize
+// Initialize Sequelize connection using environment-specific config
 const sequelize = new Sequelize(
   dbConfig.database,
   dbConfig.username,
@@ -45,7 +45,7 @@ const sequelize = new Sequelize(
 const Task = require('./task')(sequelize, Sequelize.DataTypes);
 const User = require('./user')(sequelize, Sequelize.DataTypes);
 
-// Define associations
+// Define associations between models
 const defineAssociations = () => {
   // User-Task associations
   User.hasMany(Task, {
@@ -75,10 +75,10 @@ const defineAssociations = () => {
   });
 };
 
-// Initialize associations
+// Initialize associations immediately so imports get fully wired models
 defineAssociations();
 
-// Database connection test
+// Simple health check for DB connectivity; used by sync path
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
@@ -90,7 +90,7 @@ const testConnection = async () => {
   }
 };
 
-// Sync database
+// Sync database schema metadata (migrations own DDL; we disable alter here)
 const syncDatabase = async (force = false) => {
   try {
     logger.info('Starting database synchronization...');

@@ -1,6 +1,9 @@
 const redis = require('redis');
 const logger = require('../utils/logger');
 
+// Redis client wrapper
+// Provides safe, optional caching/session helpers. The app functions without
+// Redis: failures are logged but do not crash the process.
 class RedisClient {
   constructor() {
     this.client = null;

@@ -2,7 +2,10 @@ const promClient = require('prom-client');
 
 /**
  * Prometheus metrics collector for HMCTS Task API
- * Provides detailed application metrics for monitoring and alerting
+ *
+ * Exposes metrics primitives (Counter/Gauge/Histogram) and an Express
+ * middleware that records request latencies + status counts. Controllers
+ * and utilities can call record* helpers to instrument business events.
  */
 class MetricsCollector {
   constructor() {

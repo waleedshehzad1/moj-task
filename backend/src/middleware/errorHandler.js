@@ -2,7 +2,10 @@ const logger = require('../utils/logger');
 
 /**
  * Global error handler middleware
- * Handles all errors in the application with proper logging and response formatting
+ *
+ * Normalizes framework/ORM/JWT errors into a consistent JSON shape, logs with
+ * request context, and avoids leaking sensitive details in production.
+ * Maps common Sequelize + JWT errors to 4xx; everything else defaults to 500.
  */
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
@@ -114,7 +117,7 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Prepare error response
+  // Prepare error response (consistent shape for frontend consumption)
   const errorResponse = {
     error: error.name || 'Error',
     message,

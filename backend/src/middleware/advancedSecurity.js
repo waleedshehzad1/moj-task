@@ -5,7 +5,19 @@ const logger = require('../utils/logger');
 
 /**
  * Advanced Security Middleware
- * Implements OWASP Top 10 security controls and additional protections
+ *
+ * A toolbox of optional protections that can be enabled per route/app:
+ * - Tiered rate limits (auth/api/public) with Redis-backed stores
+ * - Progressive delays for abusive clients
+ * - IP blocklist backed by Redis + temporary auto-unblock
+ * - Basic geolocation logging, payload size checks
+ * - Suspicious pattern detection for common attack signatures
+ * - Basic CSRF token guard (for non-API-key, stateful contexts)
+ *
+ * Integrate by selecting the policies you need, e.g.:
+ *   const sec = require('./advancedSecurity');
+ *   app.use(sec.ipBlockingMiddleware());
+ *   app.use(sec.createProgressiveDelay());
  */
 class SecurityMiddleware {
   constructor() {

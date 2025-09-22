@@ -11,8 +11,12 @@ const env = process.env.NODE_ENV || 'development';
 const dbConfig = config[env];
 
 /**
- * Setup the database by running migrations and seeders
- * This ensures test users and sample data are loaded automatically
+ * Database bootstrap
+ *
+ * Creates the database if missing, then runs migrations and seeders using
+ * sequelize-cli. Intended for local/dev/test convenience so engineers can
+ * run the API without manual DB prep. In CI/prod, migrations are usually
+ * orchestrated by pipelines rather than at runtime.
  */
 const setupDatabase = async () => {
   try {
@@ -47,6 +51,8 @@ const setupDatabase = async () => {
 
 /**
  * Create the database if it doesn't exist
+ * Uses a direct connection to the postgres maintenance DB to perform a
+ * presence check and CREATE DATABASE as needed.
  */
 const createDatabaseIfNotExists = async () => {
   const sequelize = new Sequelize('postgres', dbConfig.username, dbConfig.password, {

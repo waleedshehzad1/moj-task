@@ -1,3 +1,23 @@
+/**
+ * HMCTS Task Management API - Express Application Entrypoint
+ *
+ * This file wires the whole backend together. It creates the Express app,
+ * applies security and platform middleware (rate limits, CORS, sanitization),
+ * mounts versioned API routes, exposes operational endpoints (health, Swagger),
+ * and centralizes error handling and graceful shutdown.
+ *
+ * Request lifecycle overview:
+ * 1) Security + platform middleware (helmet, rate limiting, slow down, CORS, parsers)
+ * 2) Sanitization and audit logging (sanitizes inputs and logs request context)
+ * 3) Public operational endpoints (/health, /api-docs)
+ * 4) Versioned application routes (/api/v1)
+ * 5) 404 handler for unknown routes
+ * 6) Central error handler (formats, logs, and classifies errors)
+ *
+ * Startup sequence (in start()):
+ * - Run migrations/seeders, sync Sequelize, connect to Redis, then listen.
+ * - Logs helpful URLs and environment context for quick diagnostics.
+ */
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -53,7 +73,7 @@ class Application {
       }
     }));
 
-    // Rate limiting to prevent brute force attacks - More lenient for development
+  // Rate limiting to reduce brute force / abuse. In dev we allow more headroom.
     const limiter = rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
       max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 100 : 1000), // 1000 for dev, 100 for prod
@@ -64,7 +84,7 @@ class Application {
       standardHeaders: true,
       legacyHeaders: false,
       skip: (req) => {
-        // Skip rate limiting in development for certain paths
+        // In development: skip limits for core API/health to avoid friction.
         if (process.env.NODE_ENV === 'development') {
           return req.path.startsWith('/api/') || req.path.startsWith('/health');
         }
@@ -83,7 +103,7 @@ class Application {
     this.app.use(limiter);
     this.app.use(speedLimiter);
 
-    // CORS configuration - Allow frontend and development origins
+    // CORS: only allow our front-end origins in prod; in dev we allow localhost.
     const corsOptions = {
       origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, curl, postman)
@@ -120,7 +140,7 @@ class Application {
     // Compression middleware
     this.app.use(compression());
 
-    // Body parsing middleware with size limits
+    // JSON/body parsing with explicit limits and raw body capture (for webhooks).
     this.app.use(express.json({ 
       limit: '10mb',
       verify: (req, res, buf) => {
@@ -150,7 +170,7 @@ class Application {
       }));
     }
 
-    // Audit logging middleware
+  // Audit logging: captures request/response metadata, redacts sensitive fields.
     this.app.use(auditLogger);
 
     // Health check endpoint (before API key validation)
@@ -164,7 +184,7 @@ class Application {
       });
     });
 
-    // API documentation
+    // API documentation (Swagger UI) — gated by env flag for flexibility
     if (process.env.SWAGGER_ENABLED === 'true') {
       this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     }
@@ -174,7 +194,7 @@ class Application {
     // API routes
     this.app.use(`/api/${process.env.API_VERSION || 'v1'}`, routes);
 
-    // 404 handler for unknown routes
+    // 404 handler for unknown routes (kept minimal to avoid noisy logs)
     this.app.use('*', (req, res) => {
       res.status(404).json({
         error: 'Route not found',
@@ -188,7 +208,7 @@ class Application {
     // Global error handler
     this.app.use(errorHandler);
 
-    // Graceful shutdown handlers
+  // Graceful shutdown: reconcile open server + DB + Redis before exit
     process.on('SIGTERM', this.gracefulShutdown.bind(this));
     process.on('SIGINT', this.gracefulShutdown.bind(this));
 
@@ -221,7 +241,7 @@ class Application {
       await sequelize.close();
       logger.info('Database connections closed');
 
-      // Close Redis connection
+      // Close Redis connection (if available)
       const redis = require('./config/redis');
       if (redis.client && redis.client.isOpen) {
         await redis.client.quit();
