@@ -309,6 +309,7 @@ router.post('/logout', authenticateJWT, AuthController.logout);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
+// reason for validation: 1.guarantees controller sees well-formed input 2. owasp 3: injection, 5: Misconfigurations
 router.post('/forgot-password', validateBody(forgotPasswordSchema), AuthController.forgotPassword);
 
 /**

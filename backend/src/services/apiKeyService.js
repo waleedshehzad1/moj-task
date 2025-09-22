@@ -1,3 +1,19 @@
+// Purpose: A more robust, persistent API key system (generate/store hashed keys with prefixes, permissions, rate limits, revoke, usage stats).
+// Status: Incomplete placeholder/future feature; not part of the active request pipeline.
+// WHAT IT DOES
+// Generates keys: Creates 64-hex-byte secrets with a random prefix, returns the full key once, stores only a bcrypt hash + prefix.Validates keys: Splits prefix, looks up active record, checks expiry, bcrypt-compares, updates usage count and last-used time.
+// Validates keys: Splits prefix, looks up active record, checks expiry, bcrypt-compares, updates usage count and last-used time. 
+// Revokes keys: Marks keys inactive and records who/when in metadata. 
+// Lists keys: Returns safe metadata (no secrets) for a user or all keys.
+// Permissions: Checks fine-grained permissions with wildcard support (e.g., tasks:*).
+// Housekeeping/insights: Cleans expired keys and provides usage stats (avg/day, last used).
+// BENEFITS
+// Security: No plaintext keys at rest, scoped permissions, expiries, easy rotation, and per-key revocation without redeploys.
+// Auditability: Emits audit/security logs for create/validate/revoke, supporting compliance and incident response.
+// Operational control: Issue multiple keys per consumer, rate-limit per key (ready to extend), and observe usage.
+// Principle of least privilege: Grant only the permissions needed per integration.
+// Safer than env-vars: Avoids long-lived, global secrets embedded in config or pipelines.
+// Better visibility: Usage metrics and last-used timestamps help detect stale or compromised keys.
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { ApiKey } = require('../models');
