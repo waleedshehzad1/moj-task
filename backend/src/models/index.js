@@ -104,7 +104,8 @@ const syncDatabase = async (force = false) => {
     // Sync models (don't alter since we use migrations)
     await sequelize.sync({ 
       force,
-      alter: false // Disable alter since we use migrations
+      alter: false, // Disable alter since we use migrations as single source of truth (prevents schema drift)
+      // paranoid: true Ensure paranoid is true for soft deletes
     });
     
     logger.info('Database synchronized successfully');
