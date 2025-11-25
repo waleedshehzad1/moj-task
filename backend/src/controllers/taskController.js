@@ -47,18 +47,6 @@ class TaskController {
         req.body.created_by = req.user.id;
       }
 
-      if (req.body.due_date) {
-        const dueDate = new Date(req.body.due_date);
-        const isBankHoliday = await TaskController.isBankHoliday(dueDate);
-        if (isBankHoliday) {
-          return res.status(400).json({
-            error: 'ValidationError',
-            message: 'Due date cannot be a bank holiday',
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-
       // Validate assigned user exists if assigned_to is provided
       if (req.body.assigned_to) {
         const assignedUser = await User.findByPk(req.body.assigned_to);
@@ -135,22 +123,6 @@ class TaskController {
     } catch (error) {
       logger.error('Error creating task:', error);
       next(error);
-    }
-  }
-
-  // checking if date is not a bank holiday date
-
-  static async isBankHoliday(date) {
-    try {
-      console.log('Checking bank holiday for date:', date);
-      const response = await fetch('https://www.gov.uk/bank-holidays.json');
-      const data = await response.json();
-      const bankHolidays = data['england-and-wales'].events.map(event => event.date);
-      console.log('Bank Holidays:', bankHolidays);
-      return bankHolidays.includes(date.toISOString().split('T')[0]);
-    } catch (error) {
-      logger.error('Error checking bank holiday:', error);
-      return false;
     }
   }
 

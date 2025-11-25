@@ -45,21 +45,6 @@ describe('Task Controller', () => {
       due_date: new Date(Date.now() + 86400000).toISOString() // Tomorrow
     };
 
-    // it should check for bank holiday eg 25-12-2025
-    it('should not cretate a task with due date on bank holiday', async () => {
-      const invalidData = {
-        ...validTaskData,
-        due_date: '2025-12-25T10:00:00.000Z' // Christmas Day
-      };
-
-      const response = await authRequest('post', '/api/v1/tasks')
-        .send(invalidData)
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error', 'ValidationError');
-      expect(response.body.message).toContain('Due date cannot be a bank holiday');
-    });
-
     it('should create a new task with valid data', async () => {
       const response = await authRequest('post', '/api/v1/tasks')
         .send(validTaskData)
